@@ -3,7 +3,7 @@ from typing import Dict, List
 
 class Zone():
     def __init__(self, name: str, x: int, y: int, zone_type: str,
-                 color: str, max_drones: int, cur_drones: int) -> None:
+                 color: str, max_drones: int) -> None:
         """ Identity and rules of each hub"""
         self.name: str = name
         self.x: int = x
@@ -11,7 +11,7 @@ class Zone():
         self.color: str = color
         self.max_drones: int = max_drones
         self.zone_type: str = zone_type
-        self.cur_drones: int = cur_drones
+        # self.cur_drones: int = cur_drones
 
 
 class Connection():
