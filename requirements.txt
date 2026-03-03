@@ -1,0 +1,9 @@
+# Core Logic
+regex
+
+# Development & Linting
+flake8
+mypy
+
+# Type Stubs (needed for Mypy to understand external libraries)
+types-regex

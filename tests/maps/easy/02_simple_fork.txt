@@ -2,7 +2,6 @@
 nb_drones: 3
 
 start_hub: start 0 0 [color=green]
-start_hub: start 0 0 [color=green]
 
 hub: junction 1 0 [color=yellow max_drones=2]
 hub: path_a 2 1 [color=blue]

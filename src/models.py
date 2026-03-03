@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 class Zone():
@@ -16,16 +16,18 @@ class Zone():
 
 class Connection():
     """ the edges between zones """
-    def __init__(self, prev_zone, next_zone, max_link_capacity) -> None:
+    def __init__(self, prev_zone: Zone,
+                 next_zone: Zone,
+                 max_link_capacity: int) -> None:
         self.max_link_capacity: int = max_link_capacity
         self.prev_zone = prev_zone
         self.next_zone = next_zone
 
 
 class Drone():
-    def __init__(self, id, start_zone) -> None:
+    def __init__(self, id: int, start_zone: Zone) -> None:
         """ A drone is an actor in the simulation """
-        self.id = f"D{id}"
+        self.id: str = f"D{id}"
         self.start_zone: Zone = start_zone
         self.history: List[str] = [start_zone.name]
 
@@ -36,7 +38,7 @@ class Manager():
     - use dict to store zone name during parsing
     - provide a way to find all zones connected to an other zone
     """
-    def __init__(self):
+    def __init__(self) -> None:
         """
         - zone is used for parsing
         - adjency list is better for looping
@@ -49,10 +51,12 @@ class Manager():
         self.total_drone_count: int = 0
         self.real_connections: set[Tuple[str, str]] = set()
 
-    def add_zone(self, zone: Zone ) -> None:
+    def add_zone(self, zone: Zone) -> None:
         """ Just store a zone and add it to the adjency list"""
-        self.zone[zone.name] = zone  # the name of the zone will be found in parcing
-        self.adjency_list[zone.name] = []  # the zone is the key and connections will be the value
+        # the name of the zone will be found in parcing
+        self.zone[zone.name] = zone
+        # the zone is the key and connections will be the value
+        self.adjency_list[zone.name] = []
 
     def add_connection(self, connection: Connection) -> None:
         """ Adds connections bidirectionnaly """

@@ -1,7 +1,11 @@
 from typing import Dict
 import os
 from .models import Manager, Connection, Zone
-from .exceptions import MapSyntaxError, MapLogicError, MapConnectionError, FlyInError
+from .exceptions import (
+    MapSyntaxError,
+    MapLogicError,
+    MapConnectionError,
+    FlyInError)
 import re
 
 
@@ -40,14 +44,14 @@ class Parser():
         value_list = clean_line.split()
         if len(value_list) < 3:
             raise MapSyntaxError(f"Hub ({value}) needs name, x and y")
-        name, x, y = value_list[0], value_list[1], value_list[2]
+        name, x_str, y_str = value_list[0], value_list[1], value_list[2]
 
         # is this really necessary?
         if "-" in name:
             raise MapSyntaxError("Zone names cannot contain dashes")
 
         try:
-            x, y = int(x), int(y)
+            x, y = int(x_str), int(y_str)
         except ValueError:
             raise ValueError("coordinates need to be int")
         # creating a Zone object
@@ -71,7 +75,7 @@ class Parser():
                 raise MapLogicError("There is already an end hub...")
             self.manager.end_hub = new_zone
 
-    def _handle_nb_drones(self, value: str):
+    def _handle_nb_drones(self, value: str) -> None:
         """handle any number of Drones and add it to the start_hub"""
         try:
             number_drones = int(value)
@@ -81,7 +85,7 @@ class Parser():
         except FlyInError:
             raise FlyInError("could not add drone to object Drone")
 
-    def _handle_connection(self, value: str):
+    def _handle_connection(self, value: str) -> None:
         """handle connection and add it to the object class"""
         metadata = self._handle_metadata(value)
         clean_value = re.sub(r"\[.*?\]", "", value).strip()

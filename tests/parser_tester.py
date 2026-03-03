@@ -28,8 +28,10 @@ def main() -> None:
         print("--- Map Summary ---")
         print(f"Drones: {manager.total_drone_count}")
         print(f"Zones found: {len(manager.zone)}")
-        print(f"Start Hub: {manager.start_hub.name if manager.start_hub else 'None'}")
-        print(f"End Hub: {manager.end_hub.name if manager.end_hub else 'None'}")
+        print(f"Start Hub: "
+              f"{manager.start_hub.name if manager.start_hub else 'None'}")
+        print(f"End Hub: "
+              f"{manager.end_hub.name if manager.end_hub else 'None'}")
 
         print("\n--- Adjacency List (Connections) ---")
         # Change your print loop to see both:
@@ -37,7 +39,10 @@ def main() -> None:
             print(f"{zone_name} (max_drones: {zone_obj.max_drones})")
             connections = manager.adjency_list[zone_name]
             for conn in connections:
-                neighbor = conn.next_zone.name if conn.prev_zone.name == zone_name else conn.prev_zone.name
+                if conn.prev_zone.name == zone_name:
+                    neighbor = conn.next_zone.name
+                else:
+                    conn.prev_zone.name
                 print(f"  -> {neighbor} (link_cap: {conn.max_link_capacity})")
 
     except Exception as e:

@@ -9,7 +9,7 @@ class MapSyntaxError(FlyInError):
 
 
 class MapLogicError(FlyInError):
-    """Raised when the map is impossible (e.g., no start_hub or duplicate names)."""
+    """Raised when the map is impossible."""
     pass
 
 
