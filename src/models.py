@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional, Set, Tuple
 
 
 class Zone():
@@ -23,11 +23,11 @@ class Connection():
 
 
 class Drone():
-    def __init__(self, id, location, history) -> None:
+    def __init__(self, id, start_zone) -> None:
         """ A drone is an actor in the simulation """
-        self.id = id
-        self.location = location
-        self.history = history
+        self.id = f"D{id}"
+        self.start_zone: Zone = start_zone
+        self.history: List[str] = [start_zone.name]
 
 
 class Manager():
@@ -42,5 +42,32 @@ class Manager():
         - adjency list is better for looping
         """
         self.zone: Dict[str, Zone] = {}  # store zones by name for parcing
-        self.adjency_list: Dict[Zone, List[Connection]] = {}
-        self.nb_drones: list[Drone] = []
+        self.adjency_list: Dict[str, List[Connection]] = {}
+        self.drones: list[Drone] = []
+        self.start_hub: Optional[Zone] = None
+        self.end_hub: Optional[Zone] = None
+        self.total_drone_count: int = 0
+        self.real_connections: set[Tuple[str, str]] = set()
+
+    def add_zone(self, zone: Zone ) -> None:
+        """ Just store a zone and add it to the adjency list"""
+        self.zone[zone.name] = zone  # the name of the zone will be found in parcing
+        self.adjency_list[zone.name] = []  # the zone is the key and connections will be the value
+
+    def add_connection(self, connection: Connection) -> None:
+        """ Adds connections bidirectionnaly """
+        tuple = sorted([connection.prev_zone.name, connection.next_zone.name])
+        connection_key = (tuple[0], tuple[1])
+        if connection_key in self.real_connections:
+            raise ValueError("this is not a real unique connection")
+
+        self.adjency_list[connection.prev_zone.name].append(connection)
+        self.adjency_list[connection.next_zone.name].append(connection)
+        # We can now mark it as existent
+        self.real_connections.add(connection_key)
+
+    def initialize_drones(self) -> None:
+        if not self.start_hub:
+            raise ValueError("Cannot initialize drones without a start_hub")
+        for i in range(1, self.total_drone_count + 1):
+            self.drones.append(Drone(i, self.start_hub))
