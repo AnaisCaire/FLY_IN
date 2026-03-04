@@ -1,24 +1,39 @@
 from typing import Dict, List, Optional, Tuple
+from enum import Enum
+
+
+class ZoneType(Enum):
+    """ classify each zone with its type """
+    NORMAL = "normal"
+    BLOCKED = "blocked"
+    RESTRICTED = "restricted"
+    PRIORITY = "priority"
 
 
 class Zone():
-    def __init__(self, name: str, x: int, y: int, zone_type: str,
-                 color: str, max_drones: int) -> None:
+    def __init__(self,
+                 name: str,
+                 x: int,
+                 y: int,
+                 zone_type: ZoneType = ZoneType.NORMAL,
+                 color: Optional[str] = None,
+                 max_drones: int = 1) -> None:
         """ Identity and rules of each hub"""
         self.name: str = name
         self.x: int = x
         self.y: int = y
-        self.color: str = color
+        self.color: Optional[str] = color
         self.max_drones: int = max_drones
-        self.zone_type: str = zone_type
+        self.zone_type = zone_type
         # self.cur_drones: int = cur_drones
 
 
 class Connection():
     """ the edges between zones """
-    def __init__(self, prev_zone: Zone,
+    def __init__(self,
+                 prev_zone: Zone,
                  next_zone: Zone,
-                 max_link_capacity: int) -> None:
+                 max_link_capacity: int = 1) -> None:
         self.max_link_capacity: int = max_link_capacity
         self.prev_zone = prev_zone
         self.next_zone = next_zone
@@ -28,8 +43,21 @@ class Drone():
     def __init__(self, id: int, start_zone: Zone) -> None:
         """ A drone is an actor in the simulation """
         self.id: str = f"D{id}"
+        # the current zone:
         self.start_zone: Zone = start_zone
+        self.defined_path: List[Zone] = []
+        # what step of the path the drone is on:
+        self.path_index: int = 0
+        # for the restricted areas:
+        self.wait_turns: int = 0
         self.history: List[str] = [start_zone.name]
+
+    def move_to(self, next_zone: Zone) -> str:
+        """ Updates position and returns the movement string """
+        self.start_zone = next_zone
+        self.path_index += 1
+        self.history.append(next_zone.name)
+        return f"{self.id}->{next_zone.name}"
 
 
 class Manager():
@@ -75,3 +103,4 @@ class Manager():
             raise ValueError("Cannot initialize drones without a start_hub")
         for i in range(1, self.total_drone_count + 1):
             self.drones.append(Drone(i, self.start_hub))
+

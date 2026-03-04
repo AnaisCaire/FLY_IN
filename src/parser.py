@@ -1,6 +1,6 @@
 from typing import Dict
 import os
-from .models import Manager, Connection, Zone
+from .models import Manager, Connection, Zone, ZoneType
 from .exceptions import (
     MapSyntaxError,
     MapLogicError,
@@ -59,7 +59,7 @@ class Parser():
             name=name,
             x=x,
             y=y,
-            zone_type=metadata.get("zone", "normal"),
+            zone_type=ZoneType(metadata.get("zone", "normal")),
             color=metadata.get("color", "yellow"),
             max_drones=int(metadata.get("max_drones", 1)))
 

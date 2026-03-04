@@ -1,52 +1,85 @@
 import sys
+from typing import List
 from src.parser import Parser
-from src.models import Manager
+from src.models import Manager, Zone
+from src.pathfinder import Pathfinder
 
 
-def main() -> None:
+def test_parsing(file_path: str) -> Manager:
+    """Tests the parsing logic and prints the map summary."""
+    print(f"--- 1. Testing Parsing: {file_path} ---")
+    parser = Parser(file_path)
+    parser.parsing()
+    manager = parser.manager
+
+    print(f"Drones: {manager.total_drone_count} | Zones: {len(manager.zone)}")
+    print(f"Start: {manager.start_hub.name} -> Goal: {manager.end_hub.name}")
+
+    # Optional: Brief check of types
+    restricted = [n for n, z in manager.zone.items() if z.zone_type.name == "RESTRICTED"]
+    print(f"Restricted Zones found: {len(restricted)} ({', '.join(restricted[:3])}...)")
+    print("✅ Parsing OK\n")
+    return manager
+
+
+def test_single_path(manager: Manager):
+    """Tests the standard Dijkstra (absolute best path)."""
+    print("--- 2. Testing Single Optimal Path ---")
+    finder = Pathfinder(manager)
+    path = finder.find_shortest_turn_path()
+
+    if not path:
+        print("❌ No path found!")
+        return
+
+    path_names = [zone.name for zone in path]
+    print(f"Best Path: {' -> '.join(path_names)}")
+    # We calculate the cost using the logic we discussed (Restricted=2, Normal=1)
+    cost = sum(2 if z.zone_type.name == "RESTRICTED" else 1 for z in path[1:])
+    print(f"Total Turns: {cost} | Hubs: {len(path)}")
+    print("✅ Single Path OK\n")
+
+
+def test_k_shortest_paths(manager: Manager, k: int = 3):
+    """Tests Yen's Algorithm to find multiple alternative paths."""
+    print(f"--- 3. Testing Top {k} Shortest Paths ---")
+    finder = Pathfinder(manager)
+    all_paths = finder.find_k_shortest_paths(k)
+
+    if not all_paths:
+        print("❌ No alternative paths found.")
+        return
+
+    for i, path in enumerate(all_paths, 1):
+        names = [z.name for z in path]
+        cost = sum(2 if z.zone_type.name == "RESTRICTED" else 1 for z in path[1:])
+        print(f"Path #{i} ({cost} turns): {' -> '.join(names)}")
+
+    print(f"✅ Multi-Path OK (Found {len(all_paths)} paths)\n")
+
+
+def main():
     if len(sys.argv) < 2:
-        print("Usage: python main.py <map_file>")
+        print("Usage: python parser_tester.py <map_file> [k_paths]")
         sys.exit(1)
 
     file_path = sys.argv[1]
+    k_value = int(sys.argv[2]) if len(sys.argv) > 2 else 3
 
     try:
-        # 1. Initialize the Manager (The Graph)
-        manager = Manager()
+        # Step 1: Parse
+        manager = test_parsing(file_path)
 
-        # 2. Initialize the Parser with the Manager
-        # Note: Ensure your Parser.__init__ matches this signature
-        parser = Parser(file_path)
-        parser.manager = manager
+        # Step 2: Single Dijkstra
+        test_single_path(manager)
 
-        # 3. Execute Parsing
-        print(f"--- Parsing: {file_path} ---")
-        parser.parsing()
-        print("Parsing successful!\n")
-
-        # 4. Verify the Data
-        print("--- Map Summary ---")
-        print(f"Drones: {manager.total_drone_count}")
-        print(f"Zones found: {len(manager.zone)}")
-        print(f"Start Hub: "
-              f"{manager.start_hub.name if manager.start_hub else 'None'}")
-        print(f"End Hub: "
-              f"{manager.end_hub.name if manager.end_hub else 'None'}")
-
-        print("\n--- Adjacency List (Connections) ---")
-        # Change your print loop to see both:
-        for zone_name, zone_obj in manager.zone.items():
-            print(f"{zone_name} (max_drones: {zone_obj.max_drones})")
-            connections = manager.adjency_list[zone_name]
-            for conn in connections:
-                if conn.prev_zone.name == zone_name:
-                    neighbor = conn.next_zone.name
-                else:
-                    conn.prev_zone.name
-                print(f"  -> {neighbor} (link_cap: {conn.max_link_capacity})")
+        # Step 3: Multi-path (Yen's)
+        test_k_shortest_paths(manager, k=k_value)
 
     except Exception as e:
-        print(f"Test Failed: {e}")
+        print(f"💥 Critical Failure: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 

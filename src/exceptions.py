@@ -16,3 +16,8 @@ class MapLogicError(FlyInError):
 class MapConnectionError(FlyInError):
     """Raised when a connection references a non-existent hub."""
     pass
+
+
+class DijkstraPathError(FlyInError):
+    """Raises error when no path was found"""
+    pass
