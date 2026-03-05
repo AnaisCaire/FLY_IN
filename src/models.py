@@ -78,7 +78,7 @@ class Connection:
     max_link_capacity: int = 1
 
 
-@dataclass
+@dataclass(eq=False)
 class Drone:
     """A single drone navigating the zone graph.
 
@@ -92,6 +92,7 @@ class Drone:
     path_index: int = 0
     wait_turns: int = 0
     history: List[str] = field(default_factory=list)
+    arrival_turn: int = 0  # 0 = drone not in transit, N = must land at N turns
 
     def __post_init__(self) -> None:
         """Seed history with the starting zone after dataclass init."""
