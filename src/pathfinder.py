@@ -1,95 +1,158 @@
+"""Pathfinding logic: Dijkstra for single shortest path, Yen's for k-shortest.
+
+No external graph libraries (subject Chapter V).
+"""
+
 import heapq
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional, Set, Tuple
+
 from src.models import Manager, Zone, ZoneType
 from src.exceptions import MapLogicError
 
 
 class Pathfinder:
-    def __init__(self, manager: Manager):
+    """Finds optimal drone paths through the zone graph.
+
+    Args:
+        manager: Populated Manager instance from the parser.
+    """
+
+    def __init__(self, manager: Manager) -> None:
         self.manager = manager
 
-    def _reconstruct_path(self, predecessors: Dict[str, Optional[str]],
-                          goal_name: str) -> List[Zone]:
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _reconstruct_path(
+        self,
+        predecessors: Dict[str, Optional[str]],
+        goal_name: str,
+    ) -> List[Zone]:
+        """Walk the predecessor map backwards to build start→goal path.
+
+        Args:
+            predecessors: Map of zone_name → zone_name it was reached from.
+            goal_name: Name of the destination zone.
+
+        Returns:
+            Ordered list of Zone objects from start to goal.
+        """
         path: List[Zone] = []
         current: Optional[str] = goal_name
-        # Walk backward from goal to start
         while current is not None:
             path.append(self.manager.zone[current])
             current = predecessors[current]
-
-        # Reverse it so it goes Start -> Goal
         return path[::-1]
 
-    def _calculate_path_cost(self, path: List[Zone]) -> float:
-        """ total cost of a path """
-        if not path or len(path) < 2:
+    def _path_cost(self, path: List[Zone]) -> int:
+        """Sum the movement costs for every zone entered on a path.
+
+        Skips index 0 (start hub) because you never 'enter' it.
+
+        Args:
+            path: Ordered list of Zone objects.
+
+        Returns:
+            Total turn cost as an integer.
+        """
+        if len(path) < 2:
             return 0
+        return sum(zone.movement_cost for zone in path[1:])
 
-        total_turns = 0
-        # We skip the first element (start_hub) because you don't 'enter' it
-        for zone in path[1:]:
-            if zone.zone_type == ZoneType.RESTRICTED:
-                total_turns += 2
-            elif zone.zone_type == ZoneType.PRIORITY:
-                total_turns += 0.9
-            else:
-                total_turns += 1
+    def _make_edge_key(self, a: str, b: str) -> Tuple[str, str]:
+        """Return a canonical (sorted) edge key for a pair of zone names.
 
-        return total_turns
+        Args:
+            a: First zone name.
+            b: Second zone name.
 
-    def find_shortest_turn_path(self, ignore_path: set = None) -> List[Zone]:
+        Returns:
+            Tuple with the lexicographically smaller name first.
         """
-        Uses Dijkstra to find the fastest path in terms of turns.
-        """
-        if ignore_path is None:
-            ignore_path = set()
+        return (min(a, b), max(a, b))
 
-        start = self.manager.start_hub
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def find_shortest_turn_path(
+        self,
+        ignore_edges: Optional[Set[Tuple[str, str]]] = None,
+        start_override: Optional[Zone] = None,
+    ) -> List[Zone]:
+        """Dijkstra: find the path with the fewest simulation turns.
+
+        Respects zone movement costs (RESTRICTED=2, others=1).
+        Skips BLOCKED zones entirely.
+
+        Args:
+            ignore_edges: Set of canonical edge keys to treat as removed.
+                          Used by Yen's algorithm to force alternate routes.
+            start_override: Treat this zone as the start instead of
+                            manager.start_hub. Used by Yen's algorithm.
+                            Does NOT mutate the manager.
+
+        Returns:
+            Ordered list of Zone objects start→goal, or [] if unreachable.
+
+        Raises:
+            MapLogicError: If start or end hub is not set on the manager.
+        """
+        if ignore_edges is None:
+            ignore_edges = set()
+
+        # FIX 3: start_override avoids mutating manager.start_hub entirely
+        start = start_override if start_override is not None else self.manager.start_hub
         goal = self.manager.end_hub
 
-        if not start or not goal:
-            raise MapLogicError("start or end hub could not be acessed")
+        if start is None or goal is None:
+            raise MapLogicError("start_hub or end_hub is not set on the manager.")
 
-        # create a dic where each zone starts with infinity moves
-        distances: Dict[str, float] = {name: float('inf') for name in self.manager.zone}
-        distances[start.name] = 0  # this ensures the start is at 0
+        distances: Dict[str, float] = {
+            name: float('inf') for name in self.manager.zone
+        }
+        distances[start.name] = 0.0
 
-        # predecessors[zone_name] = so we remember where we passed
-        predecessors: Dict[str, Optional[str]] = {name: None for name in self.manager.zone}
+        predecessors: Dict[str, Optional[str]] = {
+            name: None for name in self.manager.zone
+        }
 
-        # Priority Queue: (cost, zone_name)
-        pq = [(0.0, start.name)]
+        # (cost, zone_name) — heapq is a min-heap by first element
+        pq: List[Tuple[float, str]] = [(0.0, start.name)]
+
         while pq:
-            # here we find the cheapest hub of the graph
-            curr_distance, curr_name = heapq.heappop(pq)
-            # Print whenever we 'visit' a hub from the queue
-            print(f"DEBUG: Visiting {curr_name} (Current turns: {curr_distance})")
+            curr_dist, curr_name = heapq.heappop(pq)
+
             if curr_name == goal.name:
                 break
-            if curr_distance > distances[curr_name]:
+
+            # Skip stale entries (a cheaper path was already found)
+            if curr_dist > distances[curr_name]:
                 continue
-            # Now lets look at the neihboors attention, this makes sure we see the connections as bidirectionnal
-            for connection in self.manager.adjency_list.get(curr_name, []):
-                path = tuple(sorted((connection.prev_zone.name, connection.next_zone.name)))
-                if path in ignore_path:
+
+            # FIX 1: use adjacency_list (new name) not adjency_list
+            for conn in self.manager.adjacency_list.get(curr_name, []):
+                edge = self._make_edge_key(
+                    conn.prev_zone.name, conn.next_zone.name
+                )
+                if edge in ignore_edges:
                     continue
-                if connection.prev_zone.name == curr_name:
-                    neighbor = connection.next_zone
-                else:
-                    neighbor = connection.prev_zone
 
-                # determine the costs for entering in neighbor
-                if neighbor.zone_type == ZoneType.RESTRICTED:
-                    move_cost = 2
-                else:
-                    move_cost = 1
+                neighbor = (
+                    conn.next_zone
+                    if conn.prev_zone.name == curr_name
+                    else conn.prev_zone
+                )
 
-                new_cost = curr_distance + move_cost
+                # FIX 2: skip BLOCKED zones using movement_cost property
+                if neighbor.zone_type == ZoneType.BLOCKED:
+                    continue
 
-                # check if the new path is better:
+                # FIX 2: use zone.movement_cost — single source of truth
+                new_cost = curr_dist + neighbor.movement_cost
+
                 if new_cost < distances[neighbor.name]:
-                    # Print when we find a better route than before
-                    print(f"  -> Found better path to {neighbor.name}: {new_cost} turns (via {curr_name})")
                     distances[neighbor.name] = new_cost
                     predecessors[neighbor.name] = curr_name
                     heapq.heappush(pq, (new_cost, neighbor.name))
@@ -99,47 +162,63 @@ class Pathfinder:
         return self._reconstruct_path(predecessors, goal.name)
 
     def find_k_shortest_paths(self, k: int) -> List[List[Zone]]:
-        # 1. Find the absolute best path
-        best_path = self.find_shortest_turn_path()
-        if not best_path:
+        """Yen's algorithm: find the k lowest-cost paths start→goal.
+
+        Args:
+            k: Maximum number of paths to return.
+
+        Returns:
+            List of up to k paths, each an ordered list of Zone objects,
+            sorted ascending by total turn cost. May return fewer than k
+            if the graph has fewer distinct simple paths.
+        """
+        best = self.find_shortest_turn_path()
+        if not best:
             return []
 
-        all_paths = [best_path]
-        potential_paths: List[List[Zone]] = []  # This is our "Sideboard" of alternatives
-        actual_start_hub = self.manager.start_hub
+        confirmed: List[List[Zone]] = [best]
+        candidates: List[List[Zone]] = []
 
-        for i in range(1, k):
+        for _ in range(1, k):
+            previous = confirmed[-1]
 
-            previous_path = all_paths[-1]  # this is the most recent best path we found
+            for j in range(len(previous) - 1):
+                spur_node = previous[j]
+                root = previous[: j + 1]
 
-            for j in range(len(previous_path) - 1):  # -1 because we cant detour at goal
-                new_node = previous_path[j]  # if j is one, the new node is the second
-                root_path = previous_path[:j + 1]  # the root path is then the first 2 nodes
+                # Build the set of edges to block at this spur point
+                blocked_edges: Set[Tuple[str, str]] = set()
+                for p in confirmed:
+                    if len(p) > j and p[: j + 1] == root:
+                        blocked_edges.add(
+                            self._make_edge_key(p[j].name, p[j + 1].name)
+                        )
 
-                # Temporary list of edges to ignore to force a new route
-                ignored = set()
-                for path in all_paths:
-                    if len(path) > j and path[:j + 1] == root_path:
-                        edge = tuple(sorted((path[j].name, path[j+1].name)))
-                        ignored.add(edge)
-                try:
-                    self.manager.start_hub = new_node
-                    new_path = self.find_shortest_turn_path(ignore_path=ignored)
-                    self.manager.start_hub = actual_start_hub
+                # FIX 3: pass start_override — never touch manager.start_hub
+                spur_path = self.find_shortest_turn_path(
+                    ignore_edges=blocked_edges,
+                    start_override=spur_node,
+                )
 
-                    if new_path:
-                        total_new_path = root_path + new_path[1:]
-                        if len(total_new_path) > 1 and total_new_path[-1] == self.manager.end_hub:
-                            if total_new_path not in all_paths and total_new_path not in potential_paths:
-                                potential_paths.append(total_new_path)
-                except MapLogicError:
-                    self.manager.start_hub = actual_start_hub
+                if not spur_path:
                     continue
 
-            if not potential_paths:
+                # root[:-1] avoids duplicating the spur_node
+                full_path = root[:-1] + spur_path
+
+                # Guard: reject paths that revisit zones (no cycles)
+                zone_names = [z.name for z in full_path]
+                if len(zone_names) != len(set(zone_names)):
+                    continue
+
+                if full_path not in confirmed and full_path not in candidates:
+                    candidates.append(full_path)
+
+            if not candidates:
                 break
 
-            potential_paths.sort(key=lambda p: self._calculate_path_cost(p))
-            all_paths.append(potential_paths.pop(0))
+            # FIX 2: sort uses _path_cost which uses movement_cost
+            candidates.sort(key=self._path_cost)
+            confirmed.append(candidates.pop(0))
 
-        return all_paths
+        return confirmed

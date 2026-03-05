@@ -1,106 +1,173 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from enum import Enum
+from dataclasses import dataclass, field
 
 
 class ZoneType(Enum):
-    """ classify each zone with its type """
+    """Classify each zone with its traversal type."""
     NORMAL = "normal"
     BLOCKED = "blocked"
     RESTRICTED = "restricted"
     PRIORITY = "priority"
 
 
-class Zone():
-    def __init__(self,
-                 name: str,
-                 x: int,
-                 y: int,
-                 zone_type: ZoneType = ZoneType.NORMAL,
-                 color: Optional[str] = None,
-                 max_drones: int = 1) -> None:
-        """ Identity and rules of each hub"""
-        self.name: str = name
-        self.x: int = x
-        self.y: int = y
-        self.color: Optional[str] = color
-        self.max_drones: int = max_drones
-        self.zone_type = zone_type
-        # self.cur_drones: int = cur_drones
+@dataclass
+class Zone:
+    """A single node in the routing graph.
+
+    Args:
+        name: Unique identifier. No dashes or spaces allowed (VII.4).
+        x: X coordinate (positive integer).
+        y: Y coordinate (positive integer).
+        is_start: True if this is the start_hub.
+        is_end: True if this is the end_hub.
+        color: Optional display color for the renderer.
+        max_drones: Maximum simultaneous occupancy (default 1, VII.2).
+        zone_type: Traversal cost/rule type (Section VI).
+    """
+    name: str
+    x: int
+    y: int
+    is_start: bool = False
+    is_end: bool = False
+    color: Optional[str] = None
+    max_drones: int = 1
+    zone_type: ZoneType = ZoneType.NORMAL
+
+    @property
+    def movement_cost(self) -> int:
+        """Return the turn cost to ENTER this zone.
+
+        Returns:
+            2 for RESTRICTED, 1 for NORMAL and PRIORITY.
+
+        Raises:
+            ValueError: If zone is BLOCKED — it must never be entered.
+        """
+        if self.zone_type == ZoneType.BLOCKED:
+            raise ValueError(
+                f"Zone '{self.name}' is BLOCKED and cannot be entered.")
+        if self.zone_type == ZoneType.RESTRICTED:
+            return 2
+        return 1
+
+    def effective_capacity(self) -> int:
+        """Return actual capacity, with start/end exception.
+
+        The start and end hubs accept unlimited drones by spec.
+
+        Returns:
+            999 for start/end zones, max_drones otherwise.
+        """
+        if self.is_start or self.is_end:
+            return 999
+        return self.max_drones
 
 
-class Connection():
-    """ the edges between zones """
-    def __init__(self,
-                 prev_zone: Zone,
-                 next_zone: Zone,
-                 max_link_capacity: int = 1) -> None:
-        self.max_link_capacity: int = max_link_capacity
-        self.prev_zone = prev_zone
-        self.next_zone = next_zone
+@dataclass
+class Connection:
+    """A bidirectional edge between two zones.
+
+    Args:
+        prev_zone: First endpoint Zone.
+        next_zone: Second endpoint Zone.
+        max_link_capacity: Max drones traversing simultaneously (default 1).
+    """
+    prev_zone: Zone
+    next_zone: Zone
+    max_link_capacity: int = 1
 
 
-class Drone():
-    def __init__(self, id: int, start_zone: Zone) -> None:
-        """ A drone is an actor in the simulation """
-        self.id: str = f"D{id}"
-        # the current zone:
-        self.start_zone: Zone = start_zone
-        self.defined_path: List[Zone] = []
-        # what step of the path the drone is on:
-        self.path_index: int = 0
-        # for the restricted areas:
-        self.wait_turns: int = 0
-        self.history: List[str] = [start_zone.name]
+@dataclass
+class Drone:
+    """A single drone navigating the zone graph.
 
-    def move_to(self, next_zone: Zone) -> str:
-        """ Updates position and returns the movement string """
-        self.start_zone = next_zone
+    Args:
+        drone_id: Unique integer identifier (output label is D<drone_id>).
+        current_zone: The zone the drone currently occupies.
+    """
+    drone_id: int
+    current_zone: Zone
+    defined_path: List[Zone] = field(default_factory=list)
+    path_index: int = 0
+    wait_turns: int = 0
+    history: List[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        """Seed history with the starting zone after dataclass init."""
+        if not self.history:
+            self.history.append(self.current_zone.name)
+
+    @property
+    def label(self) -> str:
+        """Return the output-formatted drone ID."""
+        return f"D{self.drone_id}"
+
+    def move_to(self, next_zone: Zone) -> None:
+        """Update current position and record the move in history.
+
+        Args:
+            next_zone: The zone this drone is moving into.
+        """
+        self.current_zone = next_zone
         self.path_index += 1
         self.history.append(next_zone.name)
-        return f"{self.id}->{next_zone.name}"
 
 
-class Manager():
+class Manager:
+    """Holds the full graph state: zones, connections, and drones.
+
+    Uses an adjacency list for neighbor lookups.
     """
-    The manager
-    - use dict to store zone name during parsing
-    - provide a way to find all zones connected to an other zone
-    """
+
     def __init__(self) -> None:
-        """
-        - zone is used for parsing
-        - adjency list is better for looping
-        """
-        self.zone: Dict[str, Zone] = {}  # store zones by name for parcing
-        self.adjency_list: Dict[str, List[Connection]] = {}
-        self.drones: list[Drone] = []
+        """Initialize an empty graph manager."""
+        self.zone: Dict[str, Zone] = {}
+        self.adjacency_list: Dict[str, List[Connection]] = {}
+        self.drones: List[Drone] = []
         self.start_hub: Optional[Zone] = None
         self.end_hub: Optional[Zone] = None
         self.total_drone_count: int = 0
-        self.real_connections: set[Tuple[str, str]] = set()
+        self._seen_connections: set[tuple[str, str]] = set()
 
     def add_zone(self, zone: Zone) -> None:
-        """ Just store a zone and add it to the adjency list"""
-        # the name of the zone will be found in parcing
+        """Register a zone and prepare adjacency entry.
+
+        Args:
+            zone: The Zone object to register.
+
+        Raises:
+            ValueError: If a zone with the same name already exists.
+        """
+        if zone.name in self.zone:
+            raise ValueError(f"Duplicate zone name: '{zone.name}'")
         self.zone[zone.name] = zone
-        # the zone is the key and connections will be the value
-        self.adjency_list[zone.name] = []
+        self.adjacency_list[zone.name] = []
 
     def add_connection(self, connection: Connection) -> None:
-        """ Adds connections bidirectionnaly """
-        tuple = sorted([connection.prev_zone.name, connection.next_zone.name])
-        connection_key = (tuple[0], tuple[1])
-        if connection_key in self.real_connections:
-            raise ValueError("this is not a real unique connection")
+        """Register a bidirectional connection between two zones.
 
-        self.adjency_list[connection.prev_zone.name].append(connection)
-        self.adjency_list[connection.next_zone.name].append(connection)
-        # We can now mark it as existent
-        self.real_connections.add(connection_key)
+        Args:
+            connection: The Connection object to register.
+
+        Raises:
+            ValueError: If this connection already exists.
+        """
+        a, b = connection.prev_zone.name, connection.next_zone.name
+        connection_key: tuple[str, str] = (min(a, b), max(a, b))
+        if connection_key in self._seen_connections:
+            raise ValueError(f"Duplicate connection: '{a}' <-> '{b}'")
+        self.adjacency_list[a].append(connection)
+        self.adjacency_list[b].append(connection)
+        self._seen_connections.add(connection_key)
 
     def initialize_drones(self) -> None:
-        if not self.start_hub:
-            raise ValueError("Cannot initialize drones without a start_hub")
-        for i in range(1, self.total_drone_count + 1):
-            self.drones.append(Drone(i, self.start_hub))
+        """Spawn all drones at the start hub.
 
+        Raises:
+            ValueError: If start_hub has not been set yet.
+        """
+        if not self.start_hub:
+            raise ValueError("Cannot initialize drones without a start_hub.")
+        for i in range(1, self.total_drone_count + 1):
+            self.drones.append(Drone(drone_id=i, current_zone=self.start_hub))
