@@ -3,10 +3,10 @@ PY = python3
 VENV = .venv
 BIN = $(VENV)/bin
 
-# Code directories for linting 
+# Code directories for linting
 CODE_DIRS = src tests
 
-.PHONY: install run lint lint-strict test clean
+.PHONY: install run debug lint lint-strict test clean
 
 # --- Setup ---
 
@@ -21,15 +21,31 @@ install:
 # --- Execution ---
 
 run:
+ifndef MAP
+	$(error Usage: make run MAP=<path/to/map.txt>)
+endif
 	PYTHONPATH=. $(BIN)/python3 src/main.py $(MAP)
 
-# --- Quality Assurance  ---
- 
+visual:
+	PYTHONPATH=. python3 src/visualizer.py $(MAP)
+debug:  # to define
+ifndef MAP
+	$(error Usage: make debug MAP=<path/to/map.txt>)
+endif
+	PYTHONPATH=. $(BIN)/python3 -m logging -v src/main.py $(MAP)
+
+# --- Quality Assurance ---
+
 lint:
 	@echo "--- Running Flake8 ---"
 	$(BIN)/flake8 $(CODE_DIRS)
 	@echo "--- Running Mypy ---"
-	PYTHONPATH=. $(BIN)/mypy $(CODE_DIRS) --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+	PYTHONPATH=. $(BIN)/mypy $(CODE_DIRS) \
+		--ignore-missing-imports \
+		--disallow-untyped-defs \
+		--check-untyped-defs \
+		--warn-return-any \
+		--warn-unused-ignores
 
 lint-strict:
 	@echo "--- Running Strict Linting ---"
@@ -39,7 +55,10 @@ lint-strict:
 # --- Testing ---
 
 test:
-	@echo "--- Running Parser Tests ---"
+ifndef ARGS
+	$(error Usage: make test ARGS="<path/to/map.txt> [k_paths]")
+endif
+	@echo "--- Running Integration Tests ---"
 	PYTHONPATH=. $(BIN)/python3 tests/parser_tester.py $(ARGS)
 
 # --- Cleanup ---

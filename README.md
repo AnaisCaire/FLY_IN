@@ -41,6 +41,11 @@ flow optimixation and resource scheduling
     $$\text{Latency} = \text{Path Base Cost} + \text{Drones already in that "line"}$$
     2. A Practical Example (The "Simple Fork")Imagine you have 3 Drones and 2 Paths:Path A: 3 Turns (Base Cost)Path B: 3 Turns (Base Cost)StepDronePath A Latency (3+Occ)Path B Latency (3+Occ)Decision1D13 + 0 = 33 + 0 = 3D1 takes Path A (Occ A becomes 1)2D23 + 1 = 43 + 0 = 3D2 takes Path B (Occ B becomes 1)3D33 + 1 = 43 + 1 = 4D3 takes Path A (Occ A becomes 2)Result: D1 and D3 use Path A, D2 uses Path B. The path_occupancy list ended up as [2, 1].
 
+    the engine has 3 main functions:
+    1. _prepare_drones : 
+    2. _apply_turn :
+    3. run : 
+
 ## Ressources:
 
 from https://www.algorithmexamples.com/ a ressource to explain and implement algorithms

@@ -7,3 +7,6 @@ mypy
 
 # Type Stubs (needed for Mypy to understand external libraries)
 types-regex
+
+#visulas
+pygame

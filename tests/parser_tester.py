@@ -1,7 +1,7 @@
-"""Manual integration test: parsing -> pathfinding pipeline.
+"""Manual integration test: parsing -> pathfinding -> simulation pipeline.
 
 Run with:
-    PYTHONPATH=. python3 tests/parser_tester.py maps/example.map 3
+    PYTHONPATH=. python3 tests/parser_tester.py <map_file> [k_paths]
 """
 
 import sys
@@ -9,6 +9,7 @@ from typing import List
 from src.parser import Parser
 from src.models import Manager, Zone
 from src.pathfinder import Pathfinder
+from src.engine import EngineSimulation
 
 
 def test_parsing(file_path: str) -> Manager:
@@ -97,8 +98,29 @@ def test_k_shortest_paths(manager: Manager, k: int) -> None:
     print(f"  ✅ Multi-path OK — found {len(all_paths)} path(s)\n")
 
 
+def test_engine(manager: Manager) -> None:
+    """Run the full simulation and print turn-by-turn output.
+
+    Args:
+        manager: Populated Manager from the parser.
+    """
+    print("--- 4. Full Simulation (Engine) ---")
+    engine = EngineSimulation(manager)
+    result = engine.run()
+
+    for i, turn_moves in enumerate(result, 1):
+        moves = "  ".join(f"{label}-{dest}" for label, dest in turn_moves)
+        print(f"  Turn {i:>2}: {moves}")
+
+    print(f"\n  Total turns : {engine.turn}")
+    print(f"  Drones delivered : "
+          f"{sum(1 for d in engine.drones if d.current_zone == manager.end_hub)}"
+          f"/{manager.total_drone_count}")
+    print("  ✅ Simulation OK\n")
+
+
 def main() -> None:
-    """Entry point: parse args and run the three test stages."""
+    """Entry point: parse args and run all four test stages."""
     if len(sys.argv) < 2:
         print("Usage: python tests/parser_tester.py <map_file> [k_paths]")
         sys.exit(1)
@@ -110,6 +132,7 @@ def main() -> None:
         manager = test_parsing(file_path)
         test_single_path(manager)
         test_k_shortest_paths(manager, k=k_value)
+        test_engine(manager)
 
     except Exception as e:
         print(f"\n💥 Critical failure: {e}")

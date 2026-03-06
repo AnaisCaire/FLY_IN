@@ -61,14 +61,14 @@ class Pathfinder:
         return sum(zone.movement_cost for zone in path[1:])
 
     def _make_edge_key(self, a: str, b: str) -> Tuple[str, str]:
-        """Return a canonical (sorted) edge key for a pair of zone names.
+        """Return a (sorted) edge key for a pair of zone names.
 
         Args:
             a: First zone name.
             b: Second zone name.
 
         Returns:
-            Tuple with the lexicographically smaller name first.
+            Tuple with the smaller name first.
         """
         return (min(a, b), max(a, b))
 
