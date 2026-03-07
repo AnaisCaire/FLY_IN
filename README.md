@@ -46,6 +46,12 @@ flow optimixation and resource scheduling
     2. _apply_turn :
     3. run : 
 
+## BONUS ?
+    ok now i need to restructure my code to assign paths
+    The challenger....
+    1. my 25 drones need to go to the "gate_hell1" with a cap of 1.... So i start with a minimum of 25 turns just to pass the first level.... 
+        so the problem is there are huge gaps where no drone passes to the bottle neck when they should be pipelining
+
 ## Ressources:
 
 from https://www.algorithmexamples.com/ a ressource to explain and implement algorithms

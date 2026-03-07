@@ -90,8 +90,7 @@ class Drone:
     current_zone: Zone
     defined_path: List[Zone] = field(default_factory=list)
     path_index: int = 0
-    wait_turns: int = 0
-    history: List[str] = field(default_factory=list)
+    history: List[str] = field(default_factory=list)  # need to recheck this
     arrival_turn: int = 0  # 0 = drone not in transit, N = must land at N turns
 
     def __post_init__(self) -> None:

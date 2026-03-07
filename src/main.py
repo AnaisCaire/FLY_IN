@@ -25,9 +25,6 @@ def main() -> None:
     try:
         engine = EngineSimulation(manager)
         result = engine.run()
-        for i, turn_moves in enumerate(result, 1):
-            moves = " ".join(f"{label}-{dest}" for label, dest in turn_moves)
-            print(moves)
 
     except FlyInError as e:
         sys.stderr.write(f"Error: {e}\n")
