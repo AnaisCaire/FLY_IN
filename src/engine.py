@@ -57,7 +57,10 @@ class EngineSimulation:
         )
         entering = sum(
             1 for d, move in planned.items()
-            if (move if isinstance(move, Zone) else move.next_zone) == next_zone
+            if (
+                (move if isinstance(move, Zone) else move.next_zone)
+                == next_zone
+            )
         )
         return current - leaving + entering
 
@@ -80,7 +83,11 @@ class EngineSimulation:
             # Category 2: in transit — must land this turn
             elif drone.arrival_turn > 0:
                 next_zone = drone.defined_path[drone.path_index + 1]
-                if self._net_occupancy(next_zone, planned) < next_zone.effective_capacity():
+                has_capacity = (
+                    self._net_occupancy(next_zone, planned)
+                    < next_zone.effective_capacity()
+                )
+                if has_capacity:
                     planned[drone] = next_zone
                 else:
                     raise DijkstraPathError(
@@ -91,13 +98,25 @@ class EngineSimulation:
             # Category 3: free to move — check capacity and pick next step
             elif drone.path_index < len(drone.defined_path) - 1:
                 next_zone = drone.defined_path[drone.path_index + 1]
-                if self._net_occupancy(next_zone, planned) < next_zone.effective_capacity():
+                has_capacity = (
+                    self._net_occupancy(next_zone, planned)
+                    < next_zone.effective_capacity()
+                )
+                if has_capacity:
                     if next_zone.zone_type == ZoneType.RESTRICTED:
-                        for connect in self.manager.adjacency_list[drone.current_zone.name]:
-                            if connect.prev_zone == next_zone or connect.next_zone == next_zone:
+                        for connect in self.manager.adjacency_list[
+                            drone.current_zone.name
+                        ]:
+                            if (
+                                connect.prev_zone == next_zone
+                                or connect.next_zone == next_zone
+                            ):
                                 link_usage = sum(
                                     1 for d, move in planned.items()
-                                    if isinstance(move, Connection) and move == connect
+                                    if (
+                                        isinstance(move, Connection)
+                                        and move == connect
+                                    )
                                 )
                                 if link_usage < connect.max_link_capacity:
                                     planned[drone] = connect
@@ -140,14 +159,22 @@ class EngineSimulation:
         """
         result: List[List[Tuple[str, str]]] = []
         self._give_paths()
-        while not all(d.current_zone == self.manager.end_hub for d in self.drones):
+        all_delivered = all(
+            d.current_zone == self.manager.end_hub for d in self.drones
+        )
+        while not all_delivered:
             self.turn += 1
             plan_dict = self._prepare_turn()
             output = self._apply_turn(plan_dict)
             result.append(output)
+            all_delivered = all(
+                d.current_zone == self.manager.end_hub for d in self.drones
+            )
         return result
 
-    def run_with_snapshots(self) -> Tuple[List[List[Tuple[str, str]]], List[Dict[str, str]]]:
+    def run_with_snapshots(
+        self,
+    ) -> Tuple[List[List[Tuple[str, str]]], List[Dict[str, str]]]:
         """
         same as run but needed for the visualiser to know the current position
         of each drone and not just the next position its going to be
@@ -155,10 +182,18 @@ class EngineSimulation:
         result: List[List[Tuple[str, str]]] = []
         snapshots: List[Dict[str, str]] = []
         self._give_paths()
-        while not all(d.current_zone == self.manager.end_hub for d in self.drones):
+        all_delivered = all(
+            d.current_zone == self.manager.end_hub for d in self.drones
+        )
+        while not all_delivered:
             self.turn += 1
             plan_dict = self._prepare_turn()
             output = self._apply_turn(plan_dict)
-            snapshots.append({d.label: d.current_zone.name for d in self.drones})
+            snapshots.append(
+                {d.label: d.current_zone.name for d in self.drones}
+            )
             result.append(output)
+            all_delivered = all(
+                d.current_zone == self.manager.end_hub for d in self.drones
+            )
         return result, snapshots

@@ -54,7 +54,8 @@ class Parser:
             line_num: Current line number for error messages.
 
         Raises:
-            MapSyntaxError: If name contains a dash, or fields are missing/invalid.
+            MapSyntaxError: If name contains a dash, or fields are
+                missing/invalid.
             MapLogicError: If a second start or end hub is declared.
         """
         metadata = self._handle_metadata(value)
@@ -78,7 +79,9 @@ class Parser:
             x, y = int(x_str), int(y_str)
         except ValueError:
             raise MapSyntaxError(
-                f"Line {line_num}: coordinates must be integers, got '{x_str}' '{y_str}'")
+                f"Line {line_num}: coordinates must be integers, got "
+                f"'{x_str}' '{y_str}'"
+            )
 
         raw_zone_type = metadata.get("zone", "normal")
         try:
@@ -86,7 +89,8 @@ class Parser:
         except ValueError:
             raise MapSyntaxError(
                 f"Line {line_num}: invalid zone type '{raw_zone_type}'. "
-                f"Must be one of: normal, blocked, restricted, priority.")
+                "Must be one of: normal, blocked, restricted, priority."
+            )
 
         raw_capacity = metadata.get("max_drones", "1")
         try:
@@ -95,7 +99,9 @@ class Parser:
                 raise ValueError
         except ValueError:
             raise MapSyntaxError(
-                f"Line {line_num}: max_drones must be a positive integer, got '{raw_capacity}'")
+                f"Line {line_num}: max_drones must be a positive integer, "
+                f"got '{raw_capacity}'"
+            )
 
         # FIX 1: set is_start / is_end flags HERE, in the parser, before
         # passing to the manager — the parser is the only layer that knows
@@ -140,7 +146,9 @@ class Parser:
                 raise ValueError
         except ValueError:
             raise MapSyntaxError(
-                f"Line {line_num}: nb_drones must be a positive integer, got '{value}'")
+                f"Line {line_num}: nb_drones must be a positive integer, "
+                f"got '{value}'"
+            )
         self.manager.total_drone_count = number_drones
 
     def _handle_connection(self, value: str, line_num: int) -> None:
@@ -160,7 +168,9 @@ class Parser:
         # FIX 2: missing dash is a hard syntax error, not a silent pass
         if '-' not in clean_value:
             raise MapSyntaxError(
-                f"Line {line_num}: connection must use 'zone1-zone2' format, got '{value}'")
+                f"Line {line_num}: connection must use 'zone1-zone2' format, "
+                f"got '{value}'"
+            )
 
         first, second = clean_value.split('-', 1)
         first, second = first.strip(), second.strip()
@@ -182,8 +192,9 @@ class Parser:
                 raise ValueError
         except ValueError:
             raise MapSyntaxError(
-                f"Line {line_num}: max_link_capacity must be a positive integer, "
-                f"got '{raw_capacity}'")
+                f"Line {line_num}: max_link_capacity must be a positive "
+                f"integer, got '{raw_capacity}'"
+            )
 
         new_connect = Connection(
             prev_zone=zone_a,
@@ -230,7 +241,9 @@ class Parser:
                             f"Line {line_num}: unknown keyword '{prefix}'")
 
             if not self.manager.start_hub or not self.manager.end_hub:
-                raise MapLogicError("Map is missing a start_hub or an end_hub.")
+                raise MapLogicError(
+                    "Map is missing a start_hub or an end_hub."
+                )
 
             self.manager.initialize_drones()
 

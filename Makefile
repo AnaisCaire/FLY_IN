@@ -1,4 +1,4 @@
-# Variables
+
 PY = python3
 VENV = .venv
 BIN = $(VENV)/bin
@@ -6,9 +6,7 @@ BIN = $(VENV)/bin
 # Code directories for linting
 CODE_DIRS = src tests
 
-.PHONY: install run debug lint lint-strict test clean
-
-# --- Setup ---
+.PHONY: install run debug lint lint-strict test clean visualizer
 
 install:
 	@echo "--- 1. Creating/Updating Virtual Environment ---"
@@ -18,23 +16,17 @@ install:
 	@$(BIN)/pip install flake8 mypy types-regex
 	@echo "--- Setup Complete! ---"
 
-# --- Execution ---
-
 run:
 ifndef MAP
 	$(error Usage: make run MAP=<path/to/map.txt>)
 endif
 	PYTHONPATH=. $(BIN)/python3 src/main.py $(MAP)
 
-visual:
-	PYTHONPATH=. python3 src/visualizer.py $(MAP)
-debug:  # to define
+visualiser:
 ifndef MAP
-	$(error Usage: make debug MAP=<path/to/map.txt>)
+	$(error Usage: make run MAP=<path/to/map.txt>)
 endif
-	PYTHONPATH=. $(BIN)/python3 -m logging -v src/main.py $(MAP)
-
-# --- Quality Assurance ---
+	PYTHONPATH=. $(BIN)/python3 src/visualizer.py $(MAP)
 
 lint:
 	@echo "--- Running Flake8 ---"
@@ -52,16 +44,12 @@ lint-strict:
 	$(BIN)/flake8 $(CODE_DIRS)
 	PYTHONPATH=. $(BIN)/mypy $(CODE_DIRS) --strict
 
-# --- Testing ---
-
 test:
-ifndef ARGS
-	$(error Usage: make test ARGS="<path/to/map.txt> [k_paths]")
+ifndef MAP
+	$(error Usage: make test MAP="<path/to/map.txt>")
 endif
 	@echo "--- Running Integration Tests ---"
-	PYTHONPATH=. $(BIN)/python3 tests/parser_tester.py $(ARGS)
-
-# --- Cleanup ---
+	PYTHONPATH=. $(BIN)/python3 tests/parser_tester.py $(MAP)
 
 clean:
 	rm -rf .mypy_cache .pytest_cache

@@ -103,11 +103,17 @@ class Pathfinder:
             ignore_edges = set()
 
         # FIX 3: start_override avoids mutating manager.start_hub entirely
-        start = start_override if start_override is not None else self.manager.start_hub
+        start = (
+            start_override
+            if start_override is not None
+            else self.manager.start_hub
+        )
         goal = self.manager.end_hub
 
         if start is None or goal is None:
-            raise MapLogicError("start_hub or end_hub is not set on the manager.")
+            raise MapLogicError(
+                "start_hub or end_hub is not set on the manager."
+            )
 
         distances: Dict[str, float] = {
             name: float('inf') for name in self.manager.zone

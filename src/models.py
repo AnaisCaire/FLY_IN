@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Tuple
 from enum import Enum
 from dataclasses import dataclass, field
 
@@ -129,7 +129,7 @@ class Manager:
         self.start_hub: Optional[Zone] = None
         self.end_hub: Optional[Zone] = None
         self.total_drone_count: int = 0
-        self._seen_connections: set[tuple[str, str]] = set()
+        self._seen_connections: Set[Tuple[str, str]] = set()
 
     def add_zone(self, zone: Zone) -> None:
         """Register a zone and prepare adjacency entry.
@@ -155,7 +155,7 @@ class Manager:
             ValueError: If this connection already exists.
         """
         a, b = connection.prev_zone.name, connection.next_zone.name
-        connection_key: tuple[str, str] = (min(a, b), max(a, b))
+        connection_key: Tuple[str, str] = (min(a, b), max(a, b))
         if connection_key in self._seen_connections:
             raise ValueError(f"Duplicate connection: '{a}' <-> '{b}'")
         self.adjacency_list[a].append(connection)

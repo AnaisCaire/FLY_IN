@@ -48,7 +48,8 @@ def test_parsing(file_path: str) -> Manager:
           f"{', '.join(restricted) or 'none'}")
     print(f"  Priority zones   ({len(priority)}): "
           f"{', '.join(priority) or 'none'}")
-    print(f"  Drones spawned   : {[d.label for d in manager.drones]}")
+    drone_labels = [d.label for d in manager.drones]
+    print(f"  Drones spawned   : {drone_labels}")
     print("  ✅ Parsing OK\n")
     return manager
 
@@ -113,9 +114,12 @@ def test_engine(manager: Manager) -> None:
         print(f"  Turn {i:>2}: {moves}")
 
     print(f"\n  Total turns : {engine.turn}")
-    print(f"  Drones delivered : "
-          f"{sum(1 for d in engine.drones if d.current_zone == manager.end_hub)}"
-          f"/{manager.total_drone_count}")
+    delivered = sum(
+        1 for d in engine.drones if d.current_zone == manager.end_hub
+    )
+    print(
+        f"  Drones delivered : {delivered}/{manager.total_drone_count}"
+    )
     print("  ✅ Simulation OK\n")
 
 

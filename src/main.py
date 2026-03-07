@@ -1,12 +1,11 @@
 import sys
 from src.parser import Parser
 from src.engine import EngineSimulation
-from src.exceptions import MapSyntaxError, FlyInError
+from src.exceptions import FlyInError, MapSyntaxError
 from src.renderer import Renderer
-from src.visualizer import Visualiser
 
 
-def main():
+def main() -> None:
     """ The activation script"""
     # 1 parse the output file:
 
@@ -17,7 +16,7 @@ def main():
     try:
         parser = Parser(file_path)  # instantiate a parsing class
         parser.parsing()  # activate parser
-        manager = parser.manager  # add to the manager
+        manager = parser.manager  # add to the managerz
     except MapSyntaxError as e:
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
@@ -29,9 +28,6 @@ def main():
         for i, turn_moves in enumerate(result, 1):
             moves = " ".join(f"{label}-{dest}" for label, dest in turn_moves)
             print(moves)
-        print()
-        for turn in result:
-            print(turn)
 
     except FlyInError as e:
         sys.stderr.write(f"Error: {e}\n")
