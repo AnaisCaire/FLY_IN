@@ -102,7 +102,7 @@ class Pathfinder:
         if ignore_edges is None:
             ignore_edges = set()
 
-        # FIX 3: start_override avoids mutating manager.start_hub entirely
+        # start_override avoids mutating manager.start_hub entirely
         start = (
             start_override
             if start_override is not None
@@ -115,29 +115,28 @@ class Pathfinder:
                 "start_hub or end_hub is not set on the manager."
             )
 
-        distances: Dict[str, float] = {
-            name: float('inf') for name in self.manager.zone
+        distances: Dict[str, Tuple[float, int]] = {
+            name: (float('inf'), 0) for name in self.manager.zone
         }
-        distances[start.name] = 0.0
+        distances[start.name] = (0.0, 0)
 
         predecessors: Dict[str, Optional[str]] = {
             name: None for name in self.manager.zone
         }
 
-        # (cost, zone_name) — heapq is a min-heap by first element
-        pq: List[Tuple[float, str]] = [(0.0, start.name)]
+        # priority_penalty = 0 for PRIORITY zones, 1 for others
+        pq: List[Tuple[float, int, str]] = [(0.0, 0, start.name)]
 
         while pq:
-            curr_dist, curr_name = heapq.heappop(pq)
+            curr_dist, curr_penalty, curr_name = heapq.heappop(pq)
 
             if curr_name == goal.name:
                 break
 
             # Skip stale entries (a cheaper path was already found)
-            if curr_dist > distances[curr_name]:
+            if (curr_dist, curr_penalty) > distances[curr_name]:
                 continue
 
-            # FIX 1: use adjacency_list (new name) not adjency_list
             for conn in self.manager.adjacency_list.get(curr_name, []):
                 edge = self._make_edge_key(
                     conn.prev_zone.name, conn.next_zone.name
@@ -151,19 +150,22 @@ class Pathfinder:
                     else conn.prev_zone
                 )
 
-                # FIX 2: skip BLOCKED zones using movement_cost property
+                # skip BLOCKED zones using movement_cost property
                 if neighbor.zone_type == ZoneType.BLOCKED:
                     continue
 
-                # FIX 2: use zone.movement_cost — single source of truth
+                # Fuse zone.movement_cost — single source of truth
                 new_cost = curr_dist + neighbor.movement_cost
 
-                if new_cost < distances[neighbor.name]:
-                    distances[neighbor.name] = new_cost
+                penalty = (
+                        0 if neighbor.zone_type == ZoneType.PRIORITY else 1)
+                new_penalty = curr_penalty + penalty
+                if (new_cost, new_penalty) < distances[neighbor.name]:
+                    distances[neighbor.name] = (new_cost, new_penalty)
                     predecessors[neighbor.name] = curr_name
-                    heapq.heappush(pq, (new_cost, neighbor.name))
+                    heapq.heappush(pq, (new_cost, new_penalty, neighbor.name))
 
-        if distances[goal.name] == float('inf'):
+        if distances[goal.name][0] == float('inf'):
             return []
         return self._reconstruct_path(predecessors, goal.name)
 
@@ -200,7 +202,7 @@ class Pathfinder:
                             self._make_edge_key(p[j].name, p[j + 1].name)
                         )
 
-                # FIX 3: pass start_override — never touch manager.start_hub
+                # pass start_override — never touch manager.start_hub
                 spur_path = self.find_shortest_turn_path(
                     ignore_edges=blocked_edges,
                     start_override=spur_node,
@@ -223,7 +225,7 @@ class Pathfinder:
             if not candidates:
                 break
 
-            # FIX 2: sort uses _path_cost which uses movement_cost
+            # sort uses _path_cost which uses movement_cost
             candidates.sort(key=self._path_cost)
             confirmed.append(candidates.pop(0))
 

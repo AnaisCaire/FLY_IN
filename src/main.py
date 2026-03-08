@@ -17,7 +17,7 @@ def main() -> None:
         parser = Parser(file_path)  # instantiate a parsing class
         parser.parsing()  # activate parser
         manager = parser.manager  # add to the managerz
-    except MapSyntaxError as e:
+    except FlyInError as e:
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
 

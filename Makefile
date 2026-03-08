@@ -22,6 +22,8 @@ ifndef MAP
 endif
 	PYTHONPATH=. $(BIN)/python3 src/main.py $(MAP)
 
+# add debug mode
+
 visualiser:
 ifndef MAP
 	$(error Usage: make run MAP=<path/to/map.txt>)

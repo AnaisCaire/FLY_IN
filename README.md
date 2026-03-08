@@ -52,6 +52,27 @@ flow optimixation and resource scheduling
     1. my 25 drones need to go to the "gate_hell1" with a cap of 1.... So i start with a minimum of 25 turns just to pass the first level.... 
         so the problem is there are huge gaps where no drone passes to the bottle neck when they should be pipelining
 
+## testing
+# Priority:
+this text file shows super clearly if priority is well implemented in your code:
+# Priority tiebreaker test
+"   # Two paths from start to goal, both cost exactly 3 turns:
+    #   Path A (priority): start -> priority_mid -> goal  (1 + 1 = 2 hops, cost 2)
+    #   Path B (normal):   start -> normal_mid -> goal    (1 + 1 = 2 hops, cost 2)
+    # If priority is working, Dijkstra must always return Path A.
+
+nb_drones: 1
+
+start_hub: start 0 0 [max_drones=2]
+hub: priority_mid 1 1 [zone=priority]
+hub: normal_mid 1 -1 [zone=normal]
+end_hub: goal 2 0 [max_drones=2]
+
+connection: start-priority_mid
+connection: start-normal_mid
+connection: priority_mid-goal
+connection: normal_mid-goal"
+
 ## Ressources:
 
 from https://www.algorithmexamples.com/ a ressource to explain and implement algorithms

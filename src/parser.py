@@ -202,6 +202,12 @@ class Parser:
             max_link_capacity=max_link_capacity,
         )
         self.manager.add_connection(new_connect)
+        if zone_a.zone_type == ZoneType.BLOCKED:
+            raise MapLogicError(
+                f"Line {line_num}: cannot connect to BLOCKED zone '{first}'.")
+        if zone_b.zone_type == ZoneType.BLOCKED:
+            raise MapLogicError(
+                f"Line {line_num}: cannot connect to BLOCKED zone '{second}'.")
 
     def parsing(self) -> None:
         """Read the map file and populate the manager.
@@ -247,5 +253,5 @@ class Parser:
 
             self.manager.initialize_drones()
 
-        except FlyInError as e:
-            raise FlyInError(f"Parsing failed at line {line_num}: {e}") from e
+        except FlyInError:
+            raise
