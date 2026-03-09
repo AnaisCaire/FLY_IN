@@ -1,7 +1,7 @@
 import sys
 from src.parser import Parser
 from src.engine import EngineSimulation
-from src.exceptions import FlyInError, MapSyntaxError
+from src.exceptions import FlyInError
 from src.renderer import Renderer
 
 
@@ -29,10 +29,11 @@ def main() -> None:
     except FlyInError as e:
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
-    # 4 the renderre
+    # 4 the renderer
     try:
         rend = Renderer(manager, engine)
         rend.render(result)
+        print(f"Simluation completed in: {engine.turn} turns!")
     except Exception as e:
         sys.stderr.write(f"Error: {e}")
         sys.exit(1)

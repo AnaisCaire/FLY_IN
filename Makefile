@@ -22,7 +22,14 @@ ifndef MAP
 endif
 	PYTHONPATH=. $(BIN)/python3 src/main.py $(MAP)
 
-# add debug mode
+run-all:
+	@find tests/maps -name "*.txt" | sort | while read f; do \
+		echo "--- $$f ---"; \
+		PYTHONPATH=. python3 -m src.main $$f; \
+	done
+
+debug:
+	PYTHONPATH=. python3 -m pdb src/main.py $(MAP)
 
 visualiser:
 ifndef MAP

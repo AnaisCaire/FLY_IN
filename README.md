@@ -1,92 +1,176 @@
+*This project has been created as part of the 42 curriculum by <your_login>.*
+
 # FLY_IN
-flow optimixation and resource scheduling
+flow optimization and resource scheduling
 
-## important steps
-1. Create models + parcing 
-    doing both at the same time ensures the classes have all they need
-2. the pathfinder
-    this will analyse the managers graph and give a list of all the possible routes
-    without moving the drone. == just map directions
-    inputs needed:
-        - adjency list
-        - zone objects for zone_type and max_drones
-        - max_link_capacity
+---
 
-    Attention, we will not use the Breadth-First Search (BFS) because it assumes every step is equal.
-    we need an algo that will use a "Priority Queue" meaning, 
-        - It always picks the hub that currently has the lowest total cost from the start.
-        - If it finds a path to a hub that is "longer" in distance but "cheaper" in turns, it will prioritize that path.
-        # concrete exameple:
+## Description
 
-        The Heap always gives us the zone_name with the lowest total_cost first. This ensures that if there is a 5-step "normal" path (cost 5) and a 3-step "restricted" path (cost 6), Dijkstra will pick the 5-step path because it takes fewer turns.
-2.a Dijkstra algorithm 
-    for finding paths with the lowest cumulative weight (weight = turns)
-    application: 
-    - Normal/Priority Hubs: Weight = 1.
-    - Restricted Hubs: Weight = 2.
-    - Start Hub: Weight = 0 (you're already there).
-    Problem:
-    Djikstra finds the fastest path BUT it does not take into account the zone capacity...
-    bottleneck term = when drones are blocked in a zone
-2.b # Yen's algorith:
-        need to fin the top paths (3-4 paths) so we can send more drones simultaneously
-        1. take the best path 
-        2. find a hub on that path where we deviate
-        2. do a new dijksra search from that hub ignoring the original connections
+FLY_IN is a drone routing simulation. Given a map of zones connected by links, the goal is to move all drones from a start hub to an end hub in as few turns as possible.
 
-3. the simulation engine
-    code needs:
-    - to know where the drone is **right now** to check for capacity limit, collisions
-    capacity limit is illustarted with the path occupancy and total latency concept:
-    $$\text{Latency} = \text{Path Base Cost} + \text{Drones already in that "line"}$$
-    2. A Practical Example (The "Simple Fork")Imagine you have 3 Drones and 2 Paths:Path A: 3 Turns (Base Cost)Path B: 3 Turns (Base Cost)StepDronePath A Latency (3+Occ)Path B Latency (3+Occ)Decision1D13 + 0 = 33 + 0 = 3D1 takes Path A (Occ A becomes 1)2D23 + 1 = 43 + 0 = 3D2 takes Path B (Occ B becomes 1)3D33 + 1 = 43 + 1 = 4D3 takes Path A (Occ A becomes 2)Result: D1 and D3 use Path A, D2 uses Path B. The path_occupancy list ended up as [2, 1].
+Each zone has a type that affects movement:
+- **Normal** — costs 1 turn to cross
+- **Priority** — costs 1 turn, preferred by the pathfinder
+- **Restricted** — costs 2 turns to cross (transit via a Connection object)
+- **Blocked** — inaccessible
 
-    the engine has 3 main functions:
-    1. _prepare_drones : 
-    2. _apply_turn :
-    3. run : 
+Each zone and connection also has a capacity limit — only a fixed number of drones can occupy them at once. The challenge is to route all drones efficiently without violating these constraints.
 
-## BONUS ?
-    ok now i need to restructure my code to assign paths
-    The challenger....
-    1. my 25 drones need to go to the "gate_hell1" with a cap of 1.... So i start with a minimum of 25 turns just to pass the first level.... 
-        so the problem is there are huge gaps where no drone passes to the bottle neck when they should be pipelining
+The project is built entirely in Python with no graph libraries. It includes a terminal renderer and an interactive pygame visualiser.
 
-## testing
-# Priority:
-this text file shows super clearly if priority is well implemented in your code:
-# Priority tiebreaker test
-"   # Two paths from start to goal, both cost exactly 3 turns:
-    #   Path A (priority): start -> priority_mid -> goal  (1 + 1 = 2 hops, cost 2)
-    #   Path B (normal):   start -> normal_mid -> goal    (1 + 1 = 2 hops, cost 2)
-    # If priority is working, Dijkstra must always return Path A.
+---
 
-nb_drones: 1
+## Instructions
 
-start_hub: start 0 0 [max_drones=2]
-hub: priority_mid 1 1 [zone=priority]
-hub: normal_mid 1 -1 [zone=normal]
-end_hub: goal 2 0 [max_drones=2]
+### Requirements
 
-connection: start-priority_mid
-connection: start-normal_mid
-connection: priority_mid-goal
-connection: normal_mid-goal"
+```bash
+pip install pygame
+```
 
-## Ressources:
+### Run the simulation
 
-from https://www.algorithmexamples.com/ a ressource to explain and implement algorithms
-- dijkstra Algorithm (find shortest path) here: https://python.algorithmexamples.com/web/graphs/dijkstra_algorithm.html
-- Dini's Algo here: https://python.algorithmexamples.com/web/graphs/dinic.html
+```bash
+make run MAP=maps/example.map
+```
 
-for a visual and iteractive algo explanation:
-- https://www.redblobgames.com/pathfinding/a-star/introduction.html
+### Run the visualiser
 
-for understanding real world implications:
-- https://www.youtube.com/watch?v=XeZTyUS8ZF0
+```bash
+make visualiser MAP=maps/example.map
+```
 
-Explains the Ford-Fulkerson algo:
-https://www.youtube.com/watch?v=8QO487YsLPc&t=607s
+### Run all test maps
 
-for the heapq module:
-- https://docs.python.org/3/library/heapq.html
+```bash
+make run-all
+```
+
+### Lint
+
+```bash
+make lint          # flake8
+make lint-strict   # mypy --strict
+```
+
+---
+
+## Algorithm choices and implementation strategy
+
+### Step 1 — Parsing and models
+
+The parser and models were built together so that zone objects have everything the pathfinder needs from the start: zone type, max capacity, and adjacency list with connection capacities.
+
+### Step 2 — Pathfinder
+
+**Why not BFS?**
+BFS assumes every step costs the same. Here restricted zones cost 2 turns, so BFS would give wrong results.
+
+**Dijkstra** finds the shortest path by cumulative turn cost using a priority queue (min-heap). The heap always pops the zone with the lowest total cost first, so if a 5-step normal path costs 5 turns and a 3-step restricted path costs 6 turns, Dijkstra correctly picks the 5-step path.
+
+Zone costs:
+- Normal / Priority: weight = 1
+- Restricted: weight = 2
+- Start: weight = 0
+
+**Yen's k-shortest paths** extends Dijkstra to find the top k paths instead of just the best one. It works by finding the best path, then systematically deviating from it at each node and re-running Dijkstra. This gives us a pool of alternative routes to distribute drones across.
+
+### Step 3 — Simulation engine
+
+The engine runs turn by turn. Each turn has two phases:
+
+**`_prepare_turn`** — decides where each drone wants to move, checking zone and link capacity using the `_net_occupancy` helper. Drones fall into three categories:
+1. Already delivered — skip
+2. In transit over a restricted zone — must land this turn
+3. Free — try to advance, reroute if blocked
+
+**`_apply_turn`** — commits all planned moves and updates drone positions.
+
+### Optimizations
+
+**1. Latency-based path distribution**
+Instead of sending every drone down the same shortest path, each drone picks a path based on estimated latency — path cost plus how many drones are already assigned to it. This naturally spreads drones across parallel routes.
+
+```
+Latency = Path Base Cost + Drones already assigned to that path
+```
+
+**2. Connection-leaving fix (biggest win)**
+When a drone enters a restricted zone it spends 2 turns crossing it. The original `_net_occupancy` still counted that drone as occupying the zone it just left, blocking the next drone for an extra turn for no reason. Fixing this one line dropped the challenger map from 67 turns to 48.
+
+**3. Dynamic rerouting**
+When a drone is blocked because its next zone is full, instead of waiting it reruns Dijkstra from its current position while ignoring all currently congested zones. If the alternative costs no more than 2 extra turns, it takes it immediately that same turn. The +2 tolerance prevents drones from taking massive detours just to avoid a one-turn wait.
+
+### Complexity
+
+| Operation | Complexity |
+|---|---|
+| Dijkstra (single path) | O((V + E) log V) |
+| Yen's k-shortest paths | O(k · V · (V + E) log V) |
+| `_give_paths` (once at start) | O(k · d) |
+| `_prepare_turn` (per turn) | O(d²) |
+| Full simulation | O(T · d²) |
+
+Where V = zones, E = connections, k = paths computed, d = drones, T = turns.
+
+The O(d²) per-turn cost comes from `_net_occupancy` scanning the `planned` dict for each drone. With 25 drones that's ~312 operations per turn — fine. With 1000 drones it becomes ~500,000 per turn, which would be the bottleneck.
+
+### Memory usage
+
+| Component | Complexity | Reality |
+|---|---|---|
+| k-shortest path cache | O(k · V) | k=100, V=30 → ~3000 refs, negligible |
+| Per-drone path assignment | O(d · V) | Most paths shorter than V |
+| `planned` dict (per turn) | O(d) | Discarded after each turn |
+| Visualiser snapshots | O(T · d) | 48 × 25 = 1200 strings on challenger |
+
+---
+
+## Visual representation
+
+The pygame visualiser (`make visualiser MAP=...`) renders the full zone graph with:
+
+- **Zone colors by type** — restricted zones in red, priority in green, start in light green, end in light red, normal in blue, blocked in grey
+- **Drone positions** — circles displayed above each zone showing which drones are currently there
+- **Overflow labels** — when multiple drones share a zone, a `+N` label shows the count instead of drawing overlapping circles
+- **Turn counter HUD** — current turn displayed in the top-left corner
+- **Arrow key navigation** — step forward and backward through turns
+- **Auto-scaling** — the graph fits any map size automatically
+
+This makes three things immediately visible that are invisible in the raw text output: where congestion is forming, which parallel paths drones are taking, and whether the pipeline is flowing smoothly or stalling at a bottleneck.
+
+---
+
+## Bonus
+
+The challenger map (`tests/maps/challenger/01_the_impossible_dream.txt`) completed in **48 turns** (target was ≤41). The mandatory performance targets for easy, medium, and hard maps are all met.
+
+My algo won't hit 41 turns on the challenger because `gate_hell1` is the only entry point (capacity 1), so there is no uncongested alternative for waiting drones — dynamic rerouting can't help drones that are physically stuck behind a single-file bottleneck with no bypass.
+
+---
+
+## Resources
+
+**Algorithm references:**
+## Resources
+
+- Aguilar, A. (n.d.). *Dijkstra's algorithm*. Algorithm Examples.
+    https://python.algorithmexamples.com/web/graphs/dijkstra_algorithm.html
+- Aguilar, A. (n.d.). *Dinic's algorithm*. Algorithm Examples.
+    https://python.algorithmexamples.com/web/graphs/dinic.html
+- Python Software Foundation. (n.d.). *heapq — Heap queue algorithm*. Python 3 Documentation.
+        https://docs.python.org/3/library/heapq.html
+- Patel, A. (n.d.). *Introduction to the A* algorithm*. Red Blob Games.
+https://www.redblobgames.com/pathfinding/a-star/introduction.html
+- Reducible. (2022, February 14). *This is how airlines schedule flights* [Video]. YouTube.
+    https://www.youtube.com/watch?v=XeZTyUS8ZF0
+- Spanning Tree. (2021, March 7). *Ford-Fulkerson in 5 minutes* [Video]. YouTube.
+    https://www.youtube.com/watch?v=8QO487YsLPc&t=607s
+
+**AI usage:**
+Claude (Anthropic) was used throughout this project for:
+- Debugging the `_net_occupancy` connection-leaving bug that caused the 67→48 turn improvement
+- Designing and explaining the dynamic rerouting logic with cost guard
+- Answering complexity and algorithm questions during development
+- Code review and mypy/flake8 compliance fixes

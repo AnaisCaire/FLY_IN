@@ -1,5 +1,4 @@
 """Pygame visualizer for the Fly-in drone simulation."""
-
 import sys
 import pygame
 from typing import Dict, List, Tuple, Set
