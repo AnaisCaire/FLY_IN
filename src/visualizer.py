@@ -1,26 +1,27 @@
 """Pygame visualizer for the Fly-in drone simulation."""
+
 import sys
 import pygame
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple
 from src.models import Manager, ZoneType
 
-COLORS = {
-    "bg": (20, 20, 20),
-    "connection": (80, 80, 80),
-    "normal": (70, 130, 180),
-    "restricted": (200, 50, 50),
-    "priority": (50, 160, 80),
-    "start": (100, 220, 100),
-    "end": (220, 100, 100),
-    "drone": (255, 220, 0),
-    "drone_text": (0, 0, 0),
-    "zone_text": (200, 200, 200),
-    "cap_text": (140, 140, 140),
-    "white": (255, 255, 255),
+# --- constants ---
+BG = (20,  20,  20)
+GREY = (80,  80,  80)
+WHITE = (255, 255, 255)
+YELLOW = (255, 220,   0)
+BLACK = (0,   0,    0)
+ZONE_COLORS = {
+    "start":      (100, 220, 100),
+    "end":        (220, 100, 100),
+    "restricted": (200,  50,  50),
+    "priority":   (50,  160,  80),
+    "normal":     (70,  130, 180),
 }
-
-TURN_DURATION_MS = 500
-MAX_VISIBLE_DRONES = 6
+WIN_W, WIN_H = 1400, 800
+PAD = 60
+HUD_H = 70
+MS_PER_TURN = 500
 
 
 class Visualizer:
@@ -33,218 +34,146 @@ class Visualizer:
         self.snapshots = snapshots
 
         pygame.init()
+        self.screen = pygame.display.set_mode((WIN_W, WIN_H))
+        pygame.display.set_caption("Fly-in")
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont("Arial", 11)
+        self.hfont = pygame.font.SysFont("Arial", 15, bold=True)
 
+        # fit graph into usable area
         xs = [z.x for z in manager.zone.values()]
         ys = [z.y for z in manager.zone.values()]
-        self.min_x, self.max_x = min(xs), max(xs)
-        self.min_y, self.max_y = min(ys), max(ys)
-
-        range_x = max(self.max_x - self.min_x, 1)
-        range_y = max(self.max_y - self.min_y, 1)
-
-        hud_h = 80
-        pad = 80
-
-        max_w, max_h = 1600, 900
-        usable_w = max_w - 2 * pad
-        usable_h = max_h - hud_h - 2 * pad
-
-        scale_x = usable_w // range_x
-        scale_y = usable_h // range_y
-        self.scale = max(min(scale_x, scale_y, 110), 40)
-
-        self.zone_r = max(10, min(18, self.scale // 4))
-        self.drone_r = max(5, self.zone_r // 2)
-        self.drone_sp = self.drone_r * 2 + 4
-
-        graph_w = range_x * self.scale
-        graph_h = range_y * self.scale
-
-        win_w = max(graph_w + 2 * pad, 900)
-        win_h = max(graph_h + hud_h + 2 * pad + 60, 600)
-
-        self.offset_x = (
-            (win_w - graph_w) // 2 - self.min_x * self.scale
+        rx = max(max(xs) - min(xs), 1)
+        ry = max(max(ys) - min(ys), 1)
+        self.scale = max(
+            min((WIN_W - 2 * PAD) // rx, (WIN_H - HUD_H - 2 * PAD) // ry, 110),
+            40,
         )
-        self.offset_y = (
-            hud_h
-            + pad
-            + (win_h - hud_h - 2 * pad - graph_h) // 2
-            - self.min_y * self.scale
-        )
+        self.ox = (WIN_W - rx * self.scale) // 2 - min(xs) * self.scale
+        self.oy = HUD_H + PAD - min(ys) * self.scale
+        self.zr = max(10, min(18, self.scale // 4))  # zone radius
+        self.dr = max(5, self.zr // 2)               # drone radius
 
-        self.screen = pygame.display.set_mode((win_w, win_h))
-        pygame.display.set_caption("Fly-in Drone Simulator")
-        self.clock = pygame.time.Clock()
-        font_size = max(9, self.scale // 8)
-        self.font = pygame.font.SysFont("Arial", font_size)
-        self.font_title = pygame.font.SysFont("Arial", 16, bold=True)
+    def _pos(self, x: int, y: int) -> Tuple[int, int]:
+        return (x * self.scale + self.ox, y * self.scale + self.oy)
 
-    def _to_screen(self, x: int, y: int) -> Tuple[int, int]:
-        return (
-            int(x * self.scale + self.offset_x),
-            int(y * self.scale + self.offset_y),
-        )
-
-    def _zone_color(self, zone_name: str) -> Tuple[int, int, int]:
-        zone = self.manager.zone.get(zone_name)
-        if zone is None:
-            return COLORS["normal"]
-        if zone.is_start:
-            return COLORS["start"]
-        if zone.is_end:
-            return COLORS["end"]
-        if zone.zone_type == ZoneType.RESTRICTED:
-            return COLORS["restricted"]
-        if zone.zone_type == ZoneType.PRIORITY:
-            return COLORS["priority"]
-        return COLORS["normal"]
+    def _zone_color(self, name: str) -> Tuple[int, int, int]:
+        z = self.manager.zone.get(name)
+        if z is None:
+            return ZONE_COLORS["normal"]
+        if z.is_start:
+            return ZONE_COLORS["start"]
+        if z.is_end:
+            return ZONE_COLORS["end"]
+        if z.zone_type == ZoneType.RESTRICTED:
+            return ZONE_COLORS["restricted"]
+        if z.zone_type == ZoneType.PRIORITY:
+            return ZONE_COLORS["priority"]
+        return ZONE_COLORS["normal"]
 
     def _draw_connections(self) -> None:
-        drawn: Set[Tuple[str, str]] = set()
-        for connections in self.manager.adjacency_list.values():
-            for conn in connections:
-                a, b = tuple(
-                    sorted([conn.prev_zone.name, conn.next_zone.name])
-                )
-                key: Tuple[str, str] = (a, b)
-                if key in drawn:
+        seen: set[Tuple[str, str]] = set()
+        for conns in self.manager.adjacency_list.values():
+            for c in conns:
+                a_name = c.prev_zone.name
+                b_name = c.next_zone.name
+                key: Tuple[str, str] = (
+                    min(a_name, b_name),
+                    max(a_name, b_name))
+                if key in seen:
                     continue
-                drawn.add(key)
-                s = self._to_screen(conn.prev_zone.x, conn.prev_zone.y)
-                e = self._to_screen(conn.next_zone.x, conn.next_zone.y)
-                pygame.draw.line(self.screen, COLORS["connection"], s, e, 2)
-                if conn.max_link_capacity > 1:
-                    mid = ((s[0] + e[0]) // 2, (s[1] + e[1]) // 2)
-                    lbl = self.font.render(
-                        f"x{conn.max_link_capacity}", True, (120, 120, 120)
-                    )
-                    self.screen.blit(lbl, (mid[0] + 3, mid[1] - 8))
+                seen.add(key)
+                a = self._pos(c.prev_zone.x, c.prev_zone.y)
+                b = self._pos(c.next_zone.x, c.next_zone.y)
+                pygame.draw.line(self.screen, GREY, a, b, 2)
 
     def _draw_zones(self) -> None:
-        for zone in self.manager.zone.values():
-            pos = self._to_screen(zone.x, zone.y)
-            color = self._zone_color(zone.name)
-            pygame.draw.circle(self.screen, color, pos, self.zone_r)
-            pygame.draw.circle(
-                self.screen, COLORS["white"], pos, self.zone_r, 2
-            )
-            name_lbl = self.font.render(zone.name, True, COLORS["zone_text"])
+        for z in self.manager.zone.values():
+            pos = self._pos(z.x, z.y)
+            pygame.draw.circle(self.screen,
+                               self._zone_color(z.name),
+                               pos,
+                               self.zr)
+            pygame.draw.circle(self.screen, WHITE, pos, self.zr, 2)
+            lbl = self.font.render(z.name, True, (200, 200, 200))
             self.screen.blit(
-                name_lbl,
-                (pos[0] - name_lbl.get_width() // 2, pos[1] + self.zone_r + 3),
-            )
-            if not (zone.is_start or zone.is_end):
-                cap_lbl = self.font.render(
-                    f"cap {zone.max_drones}", True, COLORS["cap_text"]
-                )
-                self.screen.blit(
-                    cap_lbl,
-                    (
-                        pos[0] - cap_lbl.get_width() // 2,
-                        pos[1] + self.zone_r + 14,
-                    ),
-                )
+                lbl,
+                (pos[0] - lbl.get_width() // 2, pos[1] + self.zr + 3))
 
     def _draw_drones(self, snapshot: Dict[str, str]) -> None:
-        zone_drones: Dict[str, List[str]] = {}
-        for label, zone_name in snapshot.items():
-            zone_drones.setdefault(zone_name, []).append(label)
+        # group drones by zone
+        by_zone: Dict[str, List[str]] = {}
+        for label, zone in snapshot.items():
+            by_zone.setdefault(zone, []).append(label)
 
-        for zone_name, labels in zone_drones.items():
-            zone = self.manager.zone.get(zone_name)
-            if zone is None:
+        sp = self.dr * 2 + 4  # spacing between drone circles
+        for zone_name, labels in by_zone.items():
+            z = self.manager.zone.get(zone_name)
+            if z is None:
                 continue
-            cx, cy = self._to_screen(zone.x, zone.y)
-            visible = sorted(labels)[:MAX_VISIBLE_DRONES]
-            n = len(visible)
-
-            for i, label in enumerate(visible):
-                dx = int((i - (n - 1) / 2) * self.drone_sp)
-                px = cx + dx
-                py = cy - self.zone_r - self.drone_r - 4
-                pygame.draw.circle(
-                    self.screen, COLORS["drone"], (px, py), self.drone_r
-                )
-                pygame.draw.circle(
-                    self.screen, COLORS["white"], (px, py), self.drone_r, 1
-                )
-                id_lbl = self.font.render(label, True, COLORS["drone_text"])
+            cx, cy = self._pos(z.x, z.y)
+            show = sorted(labels)[:6]
+            n = len(show)
+            for i, label in enumerate(show):
+                px = cx + int((i - (n - 1) / 2) * sp)
+                py = cy - self.zr - self.dr - 4
+                pygame.draw.circle(self.screen, YELLOW, (px, py), self.dr)
+                t = self.font.render(label, True, BLACK)
                 self.screen.blit(
-                    id_lbl,
-                    (px - id_lbl.get_width() // 2,
-                     py - id_lbl.get_height() // 2),
-                )
-
-            extra = len(labels) - MAX_VISIBLE_DRONES
-            if extra > 0:
-                last_dx = int(((n - 1) - (n - 1) / 2) * self.drone_sp)
-                ex_lbl = self.font.render(f"+{extra}", True, COLORS["drone"])
+                    t,
+                    (px - t.get_width() // 2, py - t.get_height() // 2))
+            if len(labels) > 6:
+                t = self.font.render(f"+{len(labels) - 6}", True, YELLOW)
                 self.screen.blit(
-                    ex_lbl,
-                    (
-                        cx + last_dx + self.drone_r + 4,
-                        cy - self.zone_r - self.drone_r * 2,
-                    ),
-                )
+                    t,
+                    (cx + n * sp // 2 + 4, cy - self.zr - self.dr * 2))
 
     def _draw_hud(self, turn: int, total: int) -> None:
-        title = self.font_title.render(
-            f"Fly-in Simulation  -  Turn {turn} / {total}  "
-            f"({'DONE' if turn == total else 'running...'})",
-            True, COLORS["white"],
-        )
-        self.screen.blit(title, (16, 10))
+        status = "DONE" if turn == total else "running"
+        t = self.hfont.render(
+            f"Turn {turn} / {total}  ({status})", True, WHITE)
+        self.screen.blit(t, (16, 10))
         legend = [
-            ("Start", COLORS["start"]),
-            ("End", COLORS["end"]),
-            ("Normal", COLORS["normal"]),
-            ("Restricted", COLORS["restricted"]),
-            ("Priority", COLORS["priority"]),
+            ("Start", ZONE_COLORS["start"]),
+            ("End", ZONE_COLORS["end"]),
+            ("Normal", ZONE_COLORS["normal"]),
+            ("Restricted", ZONE_COLORS["restricted"]),
+            ("Priority", ZONE_COLORS["priority"]),
         ]
         lx = 16
         for name, color in legend:
-            pygame.draw.circle(self.screen, color, (lx + 6, 50), 6)
-            lbl = self.font.render(name, True, COLORS["zone_text"])
-            self.screen.blit(lbl, (lx + 16, 43))
-            lx += lbl.get_width() + 28
+            pygame.draw.circle(self.screen, color, (lx + 6, 48), 6)
+            lbl = self.font.render(name, True, (200, 200, 200))
+            self.screen.blit(lbl, (lx + 16, 41))
+            lx += lbl.get_width() + 24
 
     def run(self) -> None:
         total = len(self.snapshots)
-        current_turn = 0
-        last_advance = pygame.time.get_ticks()
+        turn = 0
+        last_tick = pygame.time.get_ticks()
         running = True
         while running:
             now = pygame.time.get_ticks()
-            if (
-                now - last_advance >= TURN_DURATION_MS
-                and current_turn < total - 1
-            ):
-                current_turn += 1
-                last_advance = now
+            if now - last_tick >= MS_PER_TURN and turn < total - 1:
+                turn += 1
+                last_tick = now
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
-                    if (
-                        event.key == pygame.K_RIGHT
-                        and current_turn < total - 1
-                    ):
-                        current_turn += 1
-                        last_advance = now
-                    if (
-                        event.key == pygame.K_LEFT
-                        and current_turn > 0
-                    ):
-                        current_turn -= 1
-                        last_advance = now
-            self.screen.fill(COLORS["bg"])
+                    if event.key == pygame.K_RIGHT and turn < total - 1:
+                        turn += 1
+                        last_tick = now
+                    if event.key == pygame.K_LEFT and turn > 0:
+                        turn -= 1
+                        last_tick = now
+            self.screen.fill(BG)
             self._draw_connections()
             self._draw_zones()
-            self._draw_drones(self.snapshots[current_turn])
-            self._draw_hud(current_turn + 1, total)
+            self._draw_drones(self.snapshots[turn])
+            self._draw_hud(turn + 1, total)
             pygame.display.flip()
             self.clock.tick(60)
         pygame.quit()
@@ -260,17 +189,16 @@ def main() -> None:
     try:
         parser = Parser(sys.argv[1])
         parser.parsing()
-        manager = parser.manager
     except (FlyInError, FileNotFoundError) as e:
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
     try:
-        engine = EngineSimulation(manager)
-        _, snapshots = engine.run_with_snapshots()
+        engine = EngineSimulation(parser.manager)
+        _, snapshots = engine.run()
     except FlyInError as e:
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
-    Visualizer(manager, snapshots).run()
+    Visualizer(parser.manager, snapshots).run()
 
 
 if __name__ == "__main__":

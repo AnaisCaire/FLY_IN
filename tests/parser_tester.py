@@ -107,7 +107,7 @@ def test_engine(manager: Manager) -> None:
     """
     print("--- 4. Full Simulation (Engine) ---")
     engine = EngineSimulation(manager)
-    result = engine.run()
+    result, _ = engine.run()
 
     for i, turn_moves in enumerate(result, 1):
         moves = "  ".join(f"{label}-{dest}" for label, dest in turn_moves)

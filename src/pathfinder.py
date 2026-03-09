@@ -1,6 +1,5 @@
-"""Pathfinding logic: Dijkstra for single shortest path, Yen's for k-shortest.
-
-No external graph libraries (subject Chapter V).
+"""
+Pathfinding logic: Dijkstra for single shortest path, Yen's for k-shortest.
 """
 
 import heapq
@@ -48,7 +47,7 @@ class Pathfinder:
     def _path_cost(self, path: List[Zone]) -> int:
         """Sum the movement costs for every zone entered on a path.
 
-        Skips index 0 (start hub) because you never 'enter' it.
+        Skip index 0 (start hub) because you never 'enter' it.
 
         Args:
             path: Ordered list of Zone objects.
@@ -188,7 +187,7 @@ class Pathfinder:
 
             for j in range(len(previous) - 1):
                 spur_node = previous[j]
-                root = previous[: j + 1]
+                root = previous[: j + 1]  # !!this includes the spur_node
 
                 # Build the set of edges to block at this spur point
                 blocked_edges: Set[Tuple[str, str]] = set()
@@ -210,7 +209,7 @@ class Pathfinder:
                 # root[:-1] avoids duplicating the spur_node
                 full_path = root[:-1] + spur_path
 
-                # Guard: reject paths that revisit zones (no cycles)
+                # reject paths that revisit zones (no cycles)
                 zone_names = [z.name for z in full_path]
                 if len(zone_names) != len(set(zone_names)):
                     continue

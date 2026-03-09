@@ -8,7 +8,6 @@ from src.renderer import Renderer
 def main() -> None:
     """ The activation script"""
     # 1 parse the output file:
-
     if len(sys.argv) != 2:
         sys.stderr.write("Usage: python3 -m src.main <map_file>\n")
         sys.exit(1)
@@ -24,11 +23,11 @@ def main() -> None:
     # 3 activate the engine
     try:
         engine = EngineSimulation(manager)
-        result = engine.run()
-
+        result, _ = engine.run()
     except FlyInError as e:
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
+
     # 4 the renderer
     try:
         rend = Renderer(manager, engine)

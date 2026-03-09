@@ -14,13 +14,17 @@ class EngineSimulation:
         self.pathfinder = Pathfinder(manager)
 
     def _give_paths(self) -> None:
-        """Assign each drone a path using latency-based distribution."""
+        """
+        Assign each drone a path using latency-based distribution.
+            path_occupancy: how many drones are in that path
+            latency: how long will the drone take to arrive at goal
+        """
         paths = self.pathfinder.find_k_shortest_paths(100)
         path_cost: List[int] = []
         for path in paths:
             path_cost.append(sum(zone.movement_cost for zone in path[1:]))
         path_occupancy = [0] * len(paths)
-        for i, drone in enumerate(self.drones):
+        for _, drone in enumerate(self.drones):
             best_idx = 0
             min_latency = float('inf')
             for j, cost in enumerate(path_cost):
@@ -46,11 +50,11 @@ class EngineSimulation:
         current = sum(1 for d in self.drones if d.current_zone == next_zone)
         # Any drone that has a planned move is leaving its current zone
         leaving = sum(
-            1 for d, move in planned.items()
+            1 for d, _ in planned.items()
             if d.current_zone == next_zone
         )
         entering = sum(
-            1 for d, move in planned.items()
+            1 for _, move in planned.items()
             if (move if isinstance(move, Zone)
                 else move.next_zone) == next_zone
         )
@@ -67,7 +71,6 @@ class EngineSimulation:
         Drones not in this dict simply wait this turn.
         """
         # planned: commits made so far this turn.
-        # Used by _net_occupancy to avoid double-booking.
         planned: Dict[Drone, Union[Zone, Connection]] = {}
 
         for drone in self.drones:
@@ -82,30 +85,19 @@ class EngineSimulation:
             # arrival_turn > 0 means it MUST land this turn.
             elif drone.arrival_turn > 0:
 
-                # The landing zone is always the next step
-                # on the drone's pre-assigned path.
                 next_zone = drone.defined_path[
-                    drone.path_index + 1
-                ]
+                    drone.path_index + 1]
 
-                # Check if landing zone has room.
                 has_cap = (
                     self._net_occupancy(next_zone, planned)
-                    < next_zone.effective_capacity()
-                )
-
+                    < next_zone.effective_capacity())
                 if has_cap:
-                    # Zone has room — commit the landing.
                     planned[drone] = next_zone
                 else:
-                    # Zone is full — this should never happen
-                    # because we validated before entering
-                    # the restricted zone. Raise an error.
                     raise DijkstraPathError(
                         f"{drone.label} forced landing at "
                         f"'{next_zone.name}' blocked — "
-                        f"zone full on turn {self.turn}"
-                    )
+                        f"zone full on turn {self.turn}")
 
             # --- CATEGORY 3 ---
             # Drone is free and has more steps on its path.
@@ -113,20 +105,15 @@ class EngineSimulation:
 
                 # The next zone on the pre-assigned path.
                 next_zone = drone.defined_path[
-                    drone.path_index + 1
-                ]
+                    drone.path_index + 1]
 
-                # Check if that zone has capacity this turn.
                 has_cap = (
                     self._net_occupancy(next_zone, planned)
-                    < next_zone.effective_capacity()
-                )
+                    < next_zone.effective_capacity())
 
                 if has_cap:
                     # Zone has room — but is it restricted?
                     if next_zone.zone_type == ZoneType.RESTRICTED:
-                        # Restricted zones need a 2-turn transit
-                        # via a Connection object.
                         # Find the connection between current
                         # zone and next_zone.
                         for connect in self.manager.adjacency_list[
@@ -134,18 +121,16 @@ class EngineSimulation:
                         ]:
                             is_our_conn = (
                                 connect.prev_zone == next_zone
-                                or connect.next_zone == next_zone
-                            )
+                                or connect.next_zone == next_zone)
                             if not is_our_conn:
                                 continue
 
                             # Check connection capacity —
                             # how many drones already using it?
                             link_usage = sum(
-                                1 for d, move in planned.items()
+                                1 for _, move in planned.items()
                                 if isinstance(move, Connection)
-                                and move == connect
-                            )
+                                and move == connect)
 
                             if link_usage < connect.max_link_capacity:
                                 # Connection has room — commit.
@@ -155,10 +140,6 @@ class EngineSimulation:
                         # Normal or priority zone —
                         # move directly, no connection needed.
                         planned[drone] = next_zone
-
-                # else: next_zone is full — drone waits.
-                # Nothing added to planned = drone stays put.
-
         return planned
 
     def _apply_turn(
@@ -177,8 +158,9 @@ class EngineSimulation:
                 output.append((drone.label, in_transit))
         return output
 
-    def run(self) -> List[List[Tuple[str, str]]]:
+    def run(self) -> Tuple[List[List[Tuple[str, str]]], List[Dict[str, str]]]:
         result: List[List[Tuple[str, str]]] = []
+        snapshots: List[Dict[str, str]] = []
         self._give_paths()
         while not all(d.current_zone == self.manager.end_hub
                       for d in self.drones):
@@ -187,28 +169,7 @@ class EngineSimulation:
                 break
             plan_dict = self._prepare_turn()
             output = self._apply_turn(plan_dict)
-            result.append(output)
-        return result
-
-    def run_with_snapshots(
-            self,
-    ) -> Tuple[List[List[Tuple[str, str]]], List[Dict[str, str]]]:
-        """Same as run but records each drone's position per turn
-        for the visualiser."""
-        result: List[List[Tuple[str, str]]] = []
-        snapshots: List[Dict[str, str]] = []
-        self._give_paths()
-        while not all(
-            d.current_zone == self.manager.end_hub
-            for d in self.drones
-        ):
-            self.turn += 1
-            if self.turn > 500:
-                break
-            plan_dict = self._prepare_turn()
-            output = self._apply_turn(plan_dict)
             snapshots.append(
-                {d.label: d.current_zone.name for d in self.drones}
-            )
+                {d.label: d.current_zone.name for d in self.drones})
             result.append(output)
         return result, snapshots
