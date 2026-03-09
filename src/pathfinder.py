@@ -21,7 +21,7 @@ class Pathfinder:
         self.manager = manager
 
     # ------------------------------------------------------------------
-    # Private helpers
+    #  helpers
     # ------------------------------------------------------------------
 
     def _reconstruct_path(
@@ -73,7 +73,7 @@ class Pathfinder:
         return (min(a, b), max(a, b))
 
     # ------------------------------------------------------------------
-    # Public API
+    # Public functions
     # ------------------------------------------------------------------
 
     def find_shortest_turn_path(
@@ -87,7 +87,7 @@ class Pathfinder:
         Skips BLOCKED zones entirely.
 
         Args:
-            ignore_edges: Set of canonical edge keys to treat as removed.
+            ignore_edges: Set of edge keys to treat as removed.
                           Used by Yen's algorithm to force alternate routes.
             start_override: Treat this zone as the start instead of
                             manager.start_hub. Used by Yen's algorithm.
@@ -102,7 +102,7 @@ class Pathfinder:
         if ignore_edges is None:
             ignore_edges = set()
 
-        # start_override avoids mutating manager.start_hub entirely
+        # start_override avoids mutating manager.start_hub
         start = (
             start_override
             if start_override is not None
@@ -112,19 +112,15 @@ class Pathfinder:
 
         if start is None or goal is None:
             raise MapLogicError(
-                "start_hub or end_hub is not set on the manager."
-            )
+                "start_hub or end_hub is not set on the manager.")
 
         distances: Dict[str, Tuple[float, int]] = {
-            name: (float('inf'), 0) for name in self.manager.zone
-        }
+            name: (float('inf'), 0) for name in self.manager.zone}
         distances[start.name] = (0.0, 0)
 
         predecessors: Dict[str, Optional[str]] = {
-            name: None for name in self.manager.zone
-        }
+            name: None for name in self.manager.zone}
 
-        # priority_penalty = 0 for PRIORITY zones, 1 for others
         pq: List[Tuple[float, int, str]] = [(0.0, 0, start.name)]
 
         while pq:
