@@ -24,11 +24,6 @@ It includes a terminal renderer and an interactive pygame visualiser.
 
 ## Instructions
 
-### Requirements
-
-```bash
-pip install pygame
-```
 
 ### Create virtual enviroment with dependencies
 
@@ -169,9 +164,8 @@ My algo won't hit 41 turns on the challenger because `gate_hell1` is the only en
 
 ---
 
-## Resources
-
 **Algorithm references:**
+
 ## Resources
 
 - Aguilar, A. (n.d.). *Dijkstra's algorithm*. Algorithm Examples.

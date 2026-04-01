@@ -103,9 +103,6 @@ class Parser:
                 f"got '{raw_capacity}'"
             )
 
-        # FIX 1: set is_start / is_end flags HERE, in the parser, before
-        # passing to the manager — the parser is the only layer that knows
-        # which prefix keyword was used.
         new_zone = Zone(
             name=name,
             x=x,
@@ -165,7 +162,6 @@ class Parser:
         metadata = self._handle_metadata(value)
         clean_value = re.sub(r"\[.*?\]", "", value).strip()
 
-        # FIX 2: missing dash is a hard syntax error, not a silent pass
         if '-' not in clean_value:
             raise MapSyntaxError(
                 f"Line {line_num}: connection must use 'zone1-zone2' format, "
@@ -221,7 +217,6 @@ class Parser:
         if not os.path.exists(self.path):
             raise FileNotFoundError(f"File not found: '{self.path}'")
 
-        # FIX 3: line_num is declared before the loop so it's always in scope
         line_num = 0
         try:
             with open(self.path, 'r') as file:

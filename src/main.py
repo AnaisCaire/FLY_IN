@@ -13,14 +13,14 @@ def main() -> None:
         sys.exit(1)
     file_path = sys.argv[1]
     try:
-        parser = Parser(file_path)  # instantiate a parsing class
-        parser.parsing()  # activate parser
-        manager = parser.manager  # add to the managerz
+        parser = Parser(file_path)
+        parser.parsing()
+        manager = parser.manager
     except FlyInError as e:
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
 
-    # 3 activate the engine
+    # 2 activate the engine
     try:
         engine = EngineSimulation(manager)
         result, _ = engine.run()
@@ -28,7 +28,7 @@ def main() -> None:
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
 
-    # 4 the renderer
+    # 3 the renderer
     try:
         rend = Renderer(manager, engine)
         rend.render(result)

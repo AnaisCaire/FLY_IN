@@ -1,12 +1,9 @@
-# Core Logic
+# for string matching during parsing
 regex
-
 # Development & Linting
 flake8
 mypy
-
 # Type Stubs (needed for Mypy to understand external libraries)
 types-regex
-
-#visulas
+#visuals
 pygame
