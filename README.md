@@ -1,4 +1,4 @@
-*This project has been created as part of the 42 curriculum by <your_login>.*
+*This project has been created as part of the 42 curriculum by acaire-d.*
 
 # FLY_IN
 flow optimization and resource scheduling
@@ -17,7 +17,8 @@ Each zone has a type that affects movement:
 
 Each zone and connection also has a capacity limit — only a fixed number of drones can occupy them at once. The challenge is to route all drones efficiently without violating these constraints.
 
-The project is built entirely in Python with no graph libraries. It includes a terminal renderer and an interactive pygame visualiser.
+The project is built entirely in Python with no graph libraries. 
+It includes a terminal renderer and an interactive pygame visualiser.
 
 ---
 
@@ -29,7 +30,14 @@ The project is built entirely in Python with no graph libraries. It includes a t
 pip install pygame
 ```
 
+### Create virtual enviroment with dependencies
+
+```bash
+make install
+```
+
 ### Run the simulation
+
 
 ```bash
 make run MAP=maps/example.map
@@ -65,65 +73,76 @@ The parser and models were built together so that zone objects have everything t
 ### Step 2 — Pathfinder
 
 **Why not BFS?**
-BFS assumes every step costs the same. Here restricted zones cost 2 turns, so BFS would give wrong results.
+BFS (Breadth-First Search) assumes every step costs the same. 
+But here restricted zones cost 2 turns, so BFS would give wrong results.
 
-**Dijkstra** finds the shortest path by cumulative turn cost using a priority queue (min-heap). The heap always pops the zone with the lowest total cost first, so if a 5-step normal path costs 5 turns and a 3-step restricted path costs 6 turns, Dijkstra correctly picks the 5-step path.
+**Dijkstra** finds the shortest path by cumulative turn cost using a priority queue (min-heap).
+The heap always pops the zone with the lowest total cost first, so if a 5-step normal path costs 5 turns and a 3-step restricted path costs 6 turns, Dijkstra correctly picks the 5-step path.
 
 Zone costs:
 - Normal / Priority: weight = 1
 - Restricted: weight = 2
-- Start: weight = 0
+- Start / End: weight = 0
 
-**Yen's k-shortest paths** extends Dijkstra to find the top k paths instead of just the best one. It works by finding the best path, then systematically deviating from it at each node and re-running Dijkstra. This gives us a pool of alternative routes to distribute drones across.
+**Yen's k-shortest paths** extends Dijkstra to find the top k paths instead of just the best one. It works by finding the best path, then systematically deviating from it at each node and re-running Dijkstra. This gives us a list of alternative routes to distribute the drones.
 
 ### Step 3 — Simulation engine
 
 The engine runs turn by turn. Each turn has two phases:
 
-**`_prepare_turn`** — decides where each drone wants to move, checking zone and link capacity using the `_net_occupancy` helper. Drones fall into three categories:
+**`_prepare_turn`** — 
+decides where each drone will move, checking zone and link capacity using the `_net_occupancy` helper. 
+Drones fall into three categories:
 1. Already delivered — skip
 2. In transit over a restricted zone — must land this turn
-3. Free — try to advance, reroute if blocked
+3. Free — try to advance either in a zone or a connaection if the next zone is a restricted one
+    or, reroute if blocked
 
 **`_apply_turn`** — commits all planned moves and updates drone positions.
 
 ### Optimizations
 
 **1. Latency-based path distribution**
-Instead of sending every drone down the same shortest path, each drone picks a path based on estimated latency — path cost plus how many drones are already assigned to it. This naturally spreads drones across parallel routes.
+Instead of sending every drone down the same shortest path, each drone picks a path based on estimated latency, 
+path cost plus how many drones are already assigned to it.
+This naturally spreads drones across parallel routes.
 
 ```
 Latency = Path Base Cost + Drones already assigned to that path
 ```
 
 **2. Connection-leaving fix (biggest win)**
-When a drone enters a restricted zone it spends 2 turns crossing it. The original `_net_occupancy` still counted that drone as occupying the zone it just left, blocking the next drone for an extra turn for no reason. Fixing this one line dropped the challenger map from 67 turns to 48.
+When a drone enters a restricted zone it spends 2 turns crossing it. 
+The original `_net_occupancy` still counted that drone as occupying the zone it just left, blocking the next drone for an extra turn for no reason.
+Fixing this one line dropped the challenger map from 67 turns to 48.
 
 **3. Dynamic rerouting**
 When a drone is blocked because its next zone is full, instead of waiting it reruns Dijkstra from its current position while ignoring all currently congested zones. If the alternative costs no more than 2 extra turns, it takes it immediately that same turn. The +2 tolerance prevents drones from taking massive detours just to avoid a one-turn wait.
 
 ### Complexity
 
-| Operation | Complexity |
-|---|---|
-| Dijkstra (single path) | O((V + E) log V) |
-| Yen's k-shortest paths | O(k · V · (V + E) log V) |
-| `_give_paths` (once at start) | O(k · d) |
-| `_prepare_turn` (per turn) | O(d²) |
-| Full simulation | O(T · d²) |
+|           Operation           |        Complexity       |
+|-------------------------------|-------------------------|
+| Dijkstra (single path)        | O((V + E) log V)        |
+| Yen's k-shortest paths        | O(k · V · (V + E) log V)|
+| `_give_paths` (once at start) | O(k · d)                |
+| `_prepare_turn` (per turn)    | O(d²)                   |
+| Full simulation               | O(T · d²)               |
 
 Where V = zones, E = connections, k = paths computed, d = drones, T = turns.
 
-The O(d²) per-turn cost comes from `_net_occupancy` scanning the `planned` dict for each drone. With 25 drones that's ~312 operations per turn — fine. With 1000 drones it becomes ~500,000 per turn, which would be the bottleneck.
+The O(d²) per-turn cost comes from `_net_occupancy` scanning the `planned` dict for each drone. 
+With 25 drones that's ~312 operations per turn — fine. 
+With 1000 drones it becomes ~500,000 per turn, which would be the bottleneck.
 
 ### Memory usage
 
-| Component | Complexity | Reality |
-|---|---|---|
-| k-shortest path cache | O(k · V) | k=100, V=30 → ~3000 refs, negligible |
-| Per-drone path assignment | O(d · V) | Most paths shorter than V |
-| `planned` dict (per turn) | O(d) | Discarded after each turn |
-| Visualiser snapshots | O(T · d) | 48 × 25 = 1200 strings on challenger |
+|       Component           |Complexity |              Reality                 |
+|---------------------------|-----------|--------------------------------------|
+| k-shortest path cache     | O(k · V)  | k=100, V=30 → ~3000 refs, negligible |
+| Per-drone path assignment | O(d · V)  | Most paths shorter than V            |
+| `planned` dict (per turn) | O(d)      | Discarded after each turn            |
+| Visualiser snapshots      | O(T · d)  | 48 × 25 = 1200 strings on challenger |
 
 ---
 

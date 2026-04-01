@@ -146,6 +146,7 @@ class EngineSimulation:
         self,
         planned_moves: Dict[Drone, Union[Zone, Connection]],
     ) -> List[Tuple[str, str]]:
+
         output: List[Tuple[str, str]] = []
         for drone, move in planned_moves.items():
             if isinstance(move, Zone):
@@ -159,6 +160,7 @@ class EngineSimulation:
         return output
 
     def run(self) -> Tuple[List[List[Tuple[str, str]]], List[Dict[str, str]]]:
+
         result: List[List[Tuple[str, str]]] = []
         snapshots: List[Dict[str, str]] = []
         self._give_paths()
