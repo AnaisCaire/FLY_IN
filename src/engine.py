@@ -16,10 +16,10 @@ class EngineSimulation:
     def _give_paths(self) -> None:
         """
         Assign each drone a path using latency-based distribution.
-            path_occupancy: how many drones are in that path
-            latency: how long will the drone take to arrive at goal
+        - path_occupancy: how many drones are in that path
+        - latency: how long will the drone take to arrive at goal
         """
-        paths = self.pathfinder.find_k_shortest_paths(100)
+        paths = self.pathfinder.find_k_shortest_paths(50)
         path_cost: List[int] = []
         for path in paths:
             path_cost.append(sum(zone.movement_cost for zone in path[1:]))

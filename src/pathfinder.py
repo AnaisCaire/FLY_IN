@@ -13,7 +13,7 @@ class Pathfinder:
     """Finds optimal drone paths through the zone graph.
 
     Args:
-        manager: Populated Manager instance from the parser.
+        manager: populate the Manager instance from the parser.
     """
 
     def __init__(self, manager: Manager) -> None:
@@ -29,7 +29,8 @@ class Pathfinder:
         goal_name: str,
     ) -> List[Zone]:
         """Walk the predecessor map backwards to build start→goal path.
-
+            Dijkstra needs to be done to know the best paths so we need to
+            wait to reach goal and then go backwards to get the good paths
         Args:
             predecessors: Map of zone_name → zone_name it was reached from.
             goal_name: Name of the destination zone.
@@ -102,6 +103,7 @@ class Pathfinder:
             ignore_edges = set()
 
         # start_override avoids mutating manager.start_hub
+        # used when Dijkstra is re-run from intermediate node
         start = (
             start_override
             if start_override is not None
@@ -114,12 +116,14 @@ class Pathfinder:
                 "start_hub or end_hub is not set on the manager.")
 
         distances: Dict[str, Tuple[float, int]] = {
+            # zone_name (cost, penality)
             name: (float('inf'), 0) for name in self.manager.zone}
         distances[start.name] = (0.0, 0)
 
         predecessors: Dict[str, Optional[str]] = {
             name: None for name in self.manager.zone}
 
+        # priority queue set to start node
         pq: List[Tuple[float, int, str]] = [(0.0, 0, start.name)]
 
         while pq:
@@ -171,7 +175,7 @@ class Pathfinder:
             k: Maximum number of paths to return.
 
         Returns:
-            List of up to k paths, each an ordered list of Zone objects,
+            List of k paths, each an ordered list of Zone objects,
             sorted ascending by total turn cost. May return fewer than k
             if the graph has fewer distinct simple paths.
         """
@@ -187,8 +191,8 @@ class Pathfinder:
 
             for j in range(len(previous) - 1):
                 spur_node = previous[j]
-                root = previous[: j + 1]  # !!this includes the spur_node
-
+                root = previous[: j + 1]
+                breakpoint()
                 # Build the set of edges to block at this spur point
                 blocked_edges: Set[Tuple[str, str]] = set()
                 for p in confirmed:
@@ -196,7 +200,6 @@ class Pathfinder:
                         blocked_edges.add(
                             self._make_edge_key(p[j].name, p[j + 1].name)
                         )
-
                 # pass start_override — never touch manager.start_hub
                 spur_path = self.find_shortest_turn_path(
                     ignore_edges=blocked_edges,
@@ -220,7 +223,7 @@ class Pathfinder:
             if not candidates:
                 break
 
-            # sort uses _path_cost which uses movement_cost
+            # sort  _path_cost which uses movement_cost
             candidates.sort(key=self._path_cost)
             confirmed.append(candidates.pop(0))
 
