@@ -42,10 +42,8 @@ class EngineSimulation:
         next_zone: Zone,
         planned: Dict[Drone, Union[Zone, Connection]],
     ) -> int:
-        """Compute net occupancy of next_zone after this turn's moves.
-
-        KEY FIX: drones moving to a Connection are also leaving their zone,
-        so they no longer block the zone for incoming drones this turn.
+        """
+        Compute net occupancy of next_zone after this turn's moves.
         """
         current = sum(1 for d in self.drones if d.current_zone == next_zone)
         # Any drone that has a planned move is leaving its current zone

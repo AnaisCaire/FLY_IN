@@ -114,7 +114,7 @@ Fixing this one line dropped the challenger map from 67 turns to 48.
 **3. Dynamic rerouting**
 When a drone is blocked because its next zone is full, instead of waiting it reruns Dijkstra from its current position while ignoring all currently congested zones. If the alternative costs no more than 2 extra turns, it takes it immediately that same turn. The +2 tolerance prevents drones from taking massive detours just to avoid a one-turn wait.
 
-### Complexity
+### mathematics
 
 |           Operation           |        Complexity       |
 |-------------------------------|-------------------------|
@@ -129,15 +129,6 @@ Where V = zones, E = connections, k = paths computed, d = drones, T = turns.
 The O(d²) per-turn cost comes from `_net_occupancy` scanning the `planned` dict for each drone. 
 With 25 drones that's ~312 operations per turn — fine. 
 With 1000 drones it becomes ~500,000 per turn, which would be the bottleneck.
-
-### Memory usage
-
-|       Component           |Complexity |              Reality                 |
-|---------------------------|-----------|--------------------------------------|
-| k-shortest path cache     | O(k · V)  | k=100, V=30 → ~3000 refs, negligible |
-| Per-drone path assignment | O(d · V)  | Most paths shorter than V            |
-| `planned` dict (per turn) | O(d)      | Discarded after each turn            |
-| Visualiser snapshots      | O(T · d)  | 48 × 25 = 1200 strings on challenger |
 
 ---
 
@@ -155,6 +146,59 @@ The pygame visualiser (`make visualiser MAP=...`) renders the full zone graph wi
 This makes three things immediately visible that are invisible in the raw text output: where congestion is forming, which parallel paths drones are taking, and whether the pipeline is flowing smoothly or stalling at a bottleneck.
 
 ---
+
+### Input and Output
+
+### Input Map Format (maps/simple.map)
+
+
+        # [Hub Name] [Type] [Max Occupancy]
+        # Types: N (Normal), R (Restricted), P (Priority), B (Blocked), S (Start), E (End)
+
+        H_START S 10
+        H_ZONE1 N 1
+        H_ZONE2 R 1
+        H_END   E 10
+
+        # Connections: [Source] [Destination] [Link Capacity]
+        H_START H_ZONE1 1
+        H_START H_ZONE2 1
+        H_ZONE1 H_END 1
+        H_ZONE2 H_END 1
+
+        # Fleet: [Drone Count]
+        5 
+
+### Expected Output
+
+        [Turn 0]
+        D1, D2, D3, D4, D5 @ H_START
+
+        [Turn 1]
+        D1 -> H_ZONE1
+        D2 -> H_ZONE2 (Entering Restricted Zone: Transit 1/2)
+        D3, D4, D5 @ H_START
+
+        [Turn 2]
+        D1 -> H_END (Delivered!)
+        D2 @ H_ZONE2 (Transit 2/2)
+        D3 -> H_ZONE1
+        D4, D5 @ H_START
+
+        [Turn 3]
+        D2 -> H_END (Delivered!)
+        D3 -> H_END (Delivered!)
+        D4 -> H_ZONE1
+        D5 -> H_ZONE2 (Transit 1/2)
+
+        ...
+
+        [Summary]
+        Total Drones: 5
+        Total Turns: 6
+        Status: SUCCESS
+
+
 
 ## Bonus
 
