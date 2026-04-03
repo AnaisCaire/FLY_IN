@@ -146,6 +146,50 @@ The pygame visualiser (`make visualiser MAP=...`) renders the full zone graph wi
 This makes three things immediately visible that are invisible in the raw text output: where congestion is forming, which parallel paths drones are taking, and whether the pipeline is flowing smoothly or stalling at a bottleneck.
 
 ---
+## Workflow of program
+
+    main.py
+    │
+    ├── 1. PARSER
+    │   └── Parser(file_path).parsing()
+    │       ├── reads the map file
+    │       ├── creates Zones, Connections, Drones
+    │       └── fills Manager (zones, adjacency_list, start_hub, end_hub, drones)
+    │
+    ├── 2. ENGINE
+    │   └── EngineSimulation(manager).run()
+    │       │
+    │       ├── _give_paths()  ← called ONCE before the loop
+    │       │   ├── Pathfinder.find_k_shortest_paths(50)
+    │       │   │   ├── find_shortest_turn_path()  ← Dijkstra → path 1
+    │       │   │   └── Yen's loop (k-1 times)
+    │       │   │       ├── for each spur node in previous path
+    │       │   │       │   ├── block already-used edges
+    │       │   │       │   └── Dijkstra from spur_node → new candidate
+    │       │   │       └── pick cheapest candidate → confirmed
+    │       │   │
+    │       │   └── assign each drone to a path (latency-based)
+    │       │       latency = path_cost + how many drones already on it
+    │       │
+    │       └── SIMULATION LOOP  (one iteration = one turn)
+    │           ├── _prepare_turn()
+    │           │   for each drone:
+    │           │   ├── already at end? → skip
+    │           │   ├── in transit (restricted zone)? → must land, check capacity
+    │           │   └── free? → look at next zone on path
+    │           │       ├── zone full? → wait
+    │           │       ├── RESTRICTED zone? → enter via Connection (2-turn transit)
+    │           │       └── NORMAL/PRIORITY? → move directly
+    │           │
+    │           └── _apply_turn()
+    │               ├── drone moves to Zone → update position
+    │               └── drone enters Connection → set arrival_turn
+    │
+    └── 3. RENDERER
+        └── Renderer.render(result)
+            └── prints turn-by-turn output
+
+---
 
 ### Input and Output
 
