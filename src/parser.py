@@ -68,6 +68,10 @@ class Parser:
 
         name, x_str, y_str = value_list[0], value_list[1], value_list[2]
 
+        if name in self.manager.zone:
+            raise MapSyntaxError(
+                f"line {line_num}: zone {name} is already defined. "
+                  "Duplicate zone names are not allowed")
         if "-" in name:
             raise MapSyntaxError(
                 f"Line {line_num}: zone name '{name}' cannot contain dashes.")

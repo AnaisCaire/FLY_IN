@@ -192,7 +192,6 @@ class Pathfinder:
             for j in range(len(previous) - 1):
                 spur_node = previous[j]
                 root = previous[: j + 1]
-                breakpoint()
                 # Build the set of edges to block at this spur point
                 blocked_edges: Set[Tuple[str, str]] = set()
                 for p in confirmed:

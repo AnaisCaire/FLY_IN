@@ -5,7 +5,9 @@ from typing import List, Tuple
 
 
 class Renderer():
-    """ renders drone map"""
+    """
+    renders drone map
+    """
     def __init__(self, manager: Manager, engine: EngineSimulation) -> None:
         self.manager = manager
         self.engine = engine

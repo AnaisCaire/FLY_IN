@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Set, Tuple
 from enum import Enum
 from dataclasses import dataclass, field
+from src.exceptions import MapSyntaxError
 
 
 class ZoneType(Enum):
@@ -133,7 +134,7 @@ class Manager:
             ValueError: If a zone with the same name already exists.
         """
         if zone.name in self.zone:
-            raise ValueError(f"Duplicate zone name: '{zone.name}'")
+            raise MapSyntaxError(f"Duplicate zone name: '{zone.name}'")
         self.zone[zone.name] = zone
         self.adjacency_list[zone.name] = []
 
